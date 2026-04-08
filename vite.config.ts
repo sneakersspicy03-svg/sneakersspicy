@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   // Al usar './' los assets se cargan de forma relativa al index.html, 
   // solucionando el error 404 en GitHub Pages sin importar el nombre del repo.
-  base: './',
+  base: '/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
