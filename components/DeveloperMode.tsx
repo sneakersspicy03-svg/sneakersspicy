@@ -171,8 +171,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const handleGenerateTestProducts = async () => {
     setIsGenerating(true);
     const testProducts: Product[] = [];
-    for (let i = 1; i <= 100; i++) {
-      testProducts.push({
+    for (let i = 1; i <= 10; i++) {
+      const p: Product = {
         id: `test-${Date.now()}-${i}`,
         name: `Jordan Test ${i}`,
         brand: 'Nike',
@@ -181,15 +181,11 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         category: 'Shoes',
         availableSizes: [7, 8, 9, 10, 11],
         image: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&q=80&w=800'
-      });
+      };
+      await syncService.saveProduct(p);
     }
-    const success = await syncService.massLoadProducts(testProducts);
-    if (success) {
-      alert("🔥 100 Productos subidos a Firestore colección 'productos'.");
-      if (onLoadTestData) onLoadTestData(); // Refrescar UI si es posible
-    } else {
-      alert("❌ Error en carga masiva.");
-    }
+    alert("🔥 10 Productos subidos a Firestore colección 'productos'.");
+    if (onLoadTestData) await onLoadTestData(); // Refrescar UI si es posible
     setIsGenerating(false);
   };
 
