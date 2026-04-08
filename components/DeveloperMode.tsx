@@ -18,12 +18,12 @@ interface DeveloperModeProps {
   initialType?: 'shoes' | 'sportwear' | 'socks';
   onLoginSuccess: () => void;
   onLogout: () => void;
-  onAddProduct: (p: Product) => void;
-  onUpdateProduct: (p: Product) => void;
-  onDeleteProduct: (id: string) => void;
-  onToggleStock: (id: string, s?: number | string) => void;
-  onLoadTestData?: () => void;
-  onClearInventory?: () => void;
+  onAddProduct: (p: Product) => Promise<void>;
+  onUpdateProduct: (p: Product) => Promise<void>;
+  onDeleteProduct: (id: string) => Promise<void>;
+  onToggleStock: (id: string, s?: number | string) => Promise<void>;
+  onLoadTestData?: () => Promise<void>;
+  onClearInventory?: () => Promise<void>;
   
   onAddTennisBrand: (b: BrandStock) => void;
   onDeleteTennisBrand: (name: string) => void;
@@ -126,7 +126,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     }
   };
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     let finalSizes: (string | number)[] = [];
     if (addType === 'shoes') finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
     else if (addType === 'sportwear') finalSizes = selectedSportwearSizes;
@@ -139,7 +139,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     const product: Product = {
       id: `spicy-${Date.now()}`, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }
     };
-    onAddProduct(product);
+    await onAddProduct(product);
     alert("✅ Producto subido.");
     setActiveTab('inventory');
     setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});

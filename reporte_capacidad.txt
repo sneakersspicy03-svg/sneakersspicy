@@ -1,0 +1,32 @@
+--- REPORTE DE ARQUITECTURA Y CAPACIDAD: SNEAKERS SPICY ---
+
+1. CAPACIDAD MÁXIMA ESTIMADA
+Bajo la arquitectura actual y la regla de 1MB por producto (datos + 6 imágenes Base64):
+EL SISTEMA COLAPSA CON 1 SOLO PRODUCTO.
+
+2. CUELLOS DE BOTELLA TÉCNICOS (ANÁLISIS DE FALLO)
+• Límite de Firestore (Crítico): El código en 'syncService.ts' utiliza 'setDoc' para guardar todo el estado global (incluyendo el array de productos) en un ÚNICO documento ('config/global_state'). Firestore tiene un límite estricto de 1MB por documento. Un solo producto de 1MB agota este cupo instantáneamente.
+• Límite de localStorage (Severo): 'App.tsx' intenta guardar el inventario completo en el localStorage del navegador. El límite promedio es de 5MB. El sistema dejaría de ser persistente localmente después del 5to producto.
+• Transferencia de Datos: Cargar y enviar el array completo de productos con imágenes Base64 en cada actualización satura el ancho de banda y degrada el rendimiento del cliente (RAM) al procesar strings masivos.
+
+3. PASOS PARA SOPORTAR >1,000 PRODUCTOS
+Para alcanzar la meta de 1,000 productos (1GB de datos totales), se deben ejecutar los siguientes cambios estructurales:
+
+PASO A: Desvincular Binarios de la Base de Datos
+- Implementar Firebase Storage para las imágenes.
+- Guardar solo las URLs (strings cortos) en Firestore en lugar de Base64. Esto reduce el peso del producto en la DB de 1,000KB a menos de 2KB (Incremento de capacidad de 500x).
+
+PASO B: Arquitectura de Colecciones Granulares
+- Reemplazar 'config/global_state' por una colección llamada 'productos'.
+- Cada producto debe ser un documento independiente. Esto elimina el límite de 1MB por catálogo y permite el crecimiento hasta millones de registros.
+
+PASO C: Implementar Paginación y Lazy Loading
+- Modificar 'App.tsx' para no cargar el inventario completo al inicio.
+- Utilizar 'query', 'limit' y 'startAfter' de Firestore para cargar productos por demanda (ej. de 20 en 20).
+
+PASO D: Eliminación de localStorage para Inventario
+- El inventario debe residir exclusivamente en la nube y en una caché de estado (como React Context o Redux). localStorage solo debe usarse para el carrito y preferencias mínimas.
+
+Firmado,
+Software Architect - Gemini CLI
+08 de Abril, 2026

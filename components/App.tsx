@@ -192,9 +192,45 @@ const App: React.FC = () => {
         products={currentProducts} categories={currentCategories} tennisBrands={tennisBrands} socksBrands={socksBrands}
         isAuthorized={isAdminAuthorized} initialBrand={initialDevBrand} initialType={initialDevType}
         onLoginSuccess={() => { setIsAdminAuthorized(true); setIsDevMode(true); }}
-        onAddProduct={np => { const updated = [np, ...currentProducts]; setCurrentProducts(updated); publishState({ products: updated }); }}
-        onDeleteProduct={id => { const updated = currentProducts.filter(p => p.id !== id); setCurrentProducts(updated); publishState({ products: updated }); }}
-        onToggleStock={(id) => { const updated = currentProducts.map(p => p.id === id ? { ...p, isSoldOut: !p.isSoldOut } : p); setCurrentProducts(updated); publishState({ products: updated }); }}
+        onAddProduct={async np => { 
+          try {
+            setIsPublishing(true);
+            const savedProduct = await syncService.saveProduct(np);
+            const updated = [savedProduct, ...currentProducts]; 
+            setCurrentProducts(updated); 
+            await publishState({ products: updated }); 
+          } catch (e) {
+            alert("Error al guardar el producto.");
+          } finally {
+            setIsPublishing(false);
+          }
+        }}
+        onDeleteProduct={async id => { 
+          try {
+            setIsPublishing(true);
+            await syncService.deleteProduct(id);
+            const updated = currentProducts.filter(p => p.id !== id); 
+            setCurrentProducts(updated); 
+            await publishState({ products: updated }); 
+          } finally {
+            setIsPublishing(false);
+          }
+        }}
+        onToggleStock={async (id) => { 
+          try {
+            setIsPublishing(true);
+            const product = currentProducts.find(p => p.id === id);
+            if (product) {
+              const updatedProduct = { ...product, isSoldOut: !product.isSoldOut };
+              await syncService.saveProduct(updatedProduct);
+              const updated = currentProducts.map(p => p.id === id ? updatedProduct : p); 
+              setCurrentProducts(updated); 
+              await publishState({ products: updated }); 
+            }
+          } finally {
+            setIsPublishing(false);
+          }
+        }}
         onAddTennisBrand={nb => { const updated = [...tennisBrands, nb]; setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
         onDeleteTennisBrand={name => { const updated = tennisBrands.filter(b => b.name !== name); setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
         onUpdateTennisBrand={ub => { const updated = tennisBrands.map(b => b.name === ub.name ? ub : b); setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
@@ -207,24 +243,51 @@ const App: React.FC = () => {
         onReorderTennis={(s, t) => { const list = [...tennisBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setTennisBrands(list); publishState({ tennisBrands: list }); }}
         onReorderSocks={(s, t) => { const list = [...socksBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setSocksBrands(list); publishState({ socksBrands: list }); }}
         onReorderCategory={(s, t) => { const list = [...currentCategories]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setCurrentCategories(list); publishState({ categories: list }); }}
-        onUpdateProduct={(p) => { const updated = currentProducts.map(cp => cp.id === p.id ? p : cp); setCurrentProducts(updated); publishState({ products: updated }); }}
-        onLogout={() => { setIsAdminAuthorized(false); setIsDevMode(false); }}
-        onLoadTestData={async () => {
+        onUpdateProduct={async (p) => { 
           try {
-            const response = await fetch('/products_test.json');
-            const data = await response.json();
-            setCurrentProducts(data);
-            publishState({ products: data });
-            alert("🔥 ¡1,000 productos cargados con éxito! El sistema es infinito.");
-          } catch (e) {
-            alert("❌ Error cargando datos de prueba.");
+            setIsPublishing(true);
+            const savedProduct = await syncService.saveProduct(p);
+            const updated = currentProducts.map(cp => cp.id === p.id ? savedProduct : cp); 
+            setCurrentProducts(updated); 
+            await publishState({ products: updated }); 
+          } finally {
+            setIsPublishing(false);
           }
         }}
-        onClearInventory={() => {
+        onLogout={() => { setIsAdminAuthorized(false); setIsDevMode(false); }}
+        onLoadTestData={async () => {
+          setIsLoading(true);
+          try {
+            const cloudState = await syncService.fetchState();
+            if (cloudState) {
+              setCurrentProducts(cloudState.products);
+              setTennisBrands(cloudState.tennisBrands);
+              setSocksBrands(cloudState.socksBrands);
+              setCurrentCategories(cloudState.categories);
+              setCustomLogo(cloudState.logo);
+              if (cloudState.whatsappTemplate) setWhatsappTemplate(cloudState.whatsappTemplate);
+              alert("🔥 Datos sincronizados desde Cloud.");
+            }
+          } catch (e) {
+            alert("❌ Error sincronizando.");
+          } finally {
+            setIsLoading(false);
+          }
+        }}
+        onClearInventory={async () => {
           if(confirm("⚠️ ¿Estás SEGURO de borrar TODO el inventario? Esta acción no se puede deshacer.")) {
-            setCurrentProducts([]);
-            publishState({ products: [] });
-            alert("🧹 Inventario vaciado. Ahora puedes subir tus productos reales.");
+            try {
+              setIsPublishing(true);
+              // Borrar cada producto de la colección
+              for (const p of currentProducts) {
+                await syncService.deleteProduct(p.id);
+              }
+              setCurrentProducts([]);
+              await publishState({ products: [] });
+              alert("🧹 Inventario vaciado en Firestore y localmente.");
+            } finally {
+              setIsPublishing(false);
+            }
           }
         }}
         />
