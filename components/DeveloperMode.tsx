@@ -74,6 +74,31 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
+  // Función de compresión de imágenes
+  const compressImage = (base64: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = (MAX_WIDTH / width) * height;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+    });
+  };
+
   useEffect(() => {
     if (isOpen && (initialBrand || initialType)) {
       const type = initialType || 'shoes';
@@ -96,7 +121,11 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => setNewProduct(prev => ({ ...prev, images: { ...prev.images, [key]: ev.target?.result as string } }));
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        const compressed = await compressImage(base64);
+        setNewProduct(prev => ({ ...prev, images: { ...prev.images, [key]: compressed } }));
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -105,7 +134,10 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => onUpdateLogo(ev.target?.result as string);
+      reader.onload = async (ev) => {
+        const compressed = await compressImage(ev.target?.result as string);
+        onUpdateLogo(compressed);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -135,47 +167,58 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const handleSaveNewBanner = async () => {
     if (!newBannerData.name || !newBannerData.image) return alert("⚠️ Nombre e imagen obligatorios.");
     setIsSaving(true);
-    try {
-      const imageUrl = await syncService.uploadBannerImage(newBannerData.image, newBannerData.name);
-      
-      // Filtro estricto de tallas según sección
-      let sizes: (string | number)[] = [];
-      if (showAddBannerForm.section === 'Calzado') {
-        // Solo números (simulamos un catálogo base para la marca nueva)
-        sizes = [7, 8, 9, 10, 11, 12];
-      } else if (showAddBannerForm.section === 'Sportwear') {
-        // Solo letras
-        sizes = ['S', 'M', 'L', 'XL', 'XXL'];
-      } else {
-        // Medias siempre Talla Única
-        sizes = ['Talla Única'];
-      }
+    
+    // Compresión y Optimistic UI
+    const compressedImage = await compressImage(newBannerData.image);
+    
+    let sizes: (string | number)[] = [];
+    if (showAddBannerForm.section === 'Calzado') sizes = [7, 8, 9, 10, 11, 12];
+    else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    else sizes = ['Talla Única'];
 
-      const common = { name: newBannerData.name, marqueeImage: imageUrl, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
-      
-      if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: newBannerData.name[0] });
-      else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: newBannerData.name[0] });
-      else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: imageUrl });
-      
-      setShowAddBannerForm({section: null}); setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
-      alert("✅ Banner creado con tallas segregadas.");
-    } finally { setIsSaving(false); }
+    const common = { name: newBannerData.name, marqueeImage: compressedImage, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
+    
+    // Inyectar localmente para respuesta instantánea
+    if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: newBannerData.name[0] });
+    else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: newBannerData.name[0] });
+    else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: compressedImage });
+    
+    setShowAddBannerForm({section: null}); 
+    setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
+
+    try {
+      // Subida real a Firebase en segundo plano
+      await syncService.uploadBannerImage(compressedImage, newBannerData.name);
+      console.log("✅ Backup en Firebase finalizado.");
+    } catch (e) {
+      console.error("Error subiendo backup:", e);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveEditBanner = async () => {
     if (!editingBanner) return;
     setIsSaving(true);
+    
+    const compressed = await compressImage(editingBanner.data.marqueeImage || editingBanner.data.image);
+    const updatedData = { ...editingBanner.data, marqueeImage: compressed, image: compressed };
+
+    // Optimistic UI
+    if (editingBanner.type === 'tennis') onUpdateTennisBrand(updatedData);
+    else if (editingBanner.type === 'socks') onUpdateSocksBrand(updatedData);
+    else if (editingBanner.type === 'sportwear') onUpdateCategory(updatedData);
+
+    setEditingBanner(null);
+
     try {
-      const imageUrl = await syncService.uploadBannerImage(editingBanner.data.marqueeImage || editingBanner.data.image, editingBanner.data.name);
-      const updated = { ...editingBanner.data, marqueeImage: imageUrl, image: imageUrl };
-      
-      if (editingBanner.type === 'tennis') onUpdateTennisBrand(updated);
-      else if (editingBanner.type === 'socks') onUpdateSocksBrand(updated);
-      else if (editingBanner.type === 'sportwear') onUpdateCategory(updated);
-      
-      setEditingBanner(null);
+      await syncService.uploadBannerImage(compressed, updatedData.name);
       alert("✅ Banner actualizado.");
-    } finally { setIsSaving(false); }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const migrateHistoricalData = async () => {
