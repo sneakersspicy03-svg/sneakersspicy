@@ -2,9 +2,28 @@
 import { GoogleGenAI } from "@google/genai";
 import { ChatMessage } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Intento obtener la clave de la configuración de Vite o fallback
+const API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+
+let ai: any = null;
+try {
+  if (API_KEY) {
+    ai = new GoogleGenAI({ apiKey: API_KEY });
+  } else {
+    console.warn("⚠️ Advertencia: No hay API Key de Gemini. El asistente IA estará desactivado.");
+  }
+} catch (e) {
+  console.error("❌ Error inicializando Gemini:", e);
+}
 
 export const getTennisAdvice = async (userMessage: string, history: ChatMessage[]) => {
+  if (!ai) {
+    return {
+      text: "El asistente experto está en mantenimiento. ¡Pero puedes ver todos nuestros productos abajo!",
+      links: []
+    };
+  }
+
   try {
     const chat = ai.chats.create({
       model: 'gemini-3-flash-preview',

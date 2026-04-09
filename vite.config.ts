@@ -9,8 +9,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-    sourcemap: false,
-    minify: 'terser',
+    sourcemap: true, // Habilitar sourcemaps para diagnóstico
+    minify: 'esbuild',
   },
   define: {
     // Permite que el código acceda a process.env.API_KEY como requiere el SDK de Gemini
