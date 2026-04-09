@@ -1,6 +1,6 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Product, SportwearCategory, BrandStock } from '../types';
 
@@ -55,30 +55,40 @@ export const syncService = {
 
   saveProduct: async (product: Product): Promise<Product> => {
     try {
-      // 1. Manejar imagen si es Base64
-      if (product.image.startsWith('data:image/')) {
-        const url = await syncService.uploadImage(product.image, `${product.id}_img`);
-        product.image = url;
+      // Proceso de Erradicación de Base64: Forzar URLs de Storage
+      let mainImageUrl = product.image;
+      if (mainImageUrl.startsWith('data:image/')) {
+        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main`);
       }
       
-      // 2. Manejar imágenes adicionales (objeto estructurado ProductImages)
+      const updatedImages: any = {};
       if (product.images) {
-        const updatedImages: any = { ...product.images };
-        for (const key of Object.keys(product.images)) {
-          const img = (product.images as any)[key];
-          if (img && img.startsWith('data:image/')) {
-            updatedImages[key] = await syncService.uploadImage(img, `${product.id}_${key}`);
+        for (const [key, val] of Object.entries(product.images)) {
+          if (typeof val === 'string' && val.startsWith('data:image/')) {
+            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}`);
+          } else {
+            updatedImages[key] = val;
           }
         }
-        product.images = updatedImages;
       }
 
-      // 3. Guardar documento individual
+      const finalProduct = { ...product, image: mainImageUrl, images: updatedImages };
       const docRef = doc(db, "productos", product.id);
-      await setDoc(docRef, product);
-      return product;
+      await setDoc(docRef, finalProduct);
+      return finalProduct;
     } catch (error) {
       console.error('Save Product Error:', error);
+      throw error;
+    }
+  },
+
+  toggleStock: async (id: string, isSoldOut: boolean): Promise<void> => {
+    try {
+      // ACTUALIZACIÓN ATÓMICA: Únicamente el campo isSoldOut
+      const docRef = doc(db, "productos", id);
+      await updateDoc(docRef, { isSoldOut });
+    } catch (error) {
+      console.error('Toggle Stock Error:', error);
       throw error;
     }
   },
@@ -93,11 +103,8 @@ export const syncService = {
 
   fetchState: async (): Promise<GlobalState | null> => {
     try {
-      // 1. Cargar configuración global (sin productos)
       const configRef = doc(db, "config", "global_state");
       const configSnap = await getDoc(configRef);
-      
-      // 2. Cargar todos los productos de la colección independiente
       const productsSnap = await getDocs(collection(db, "productos"));
       const productsList: Product[] = [];
       productsSnap.forEach(doc => productsList.push(doc.data() as Product));
@@ -107,27 +114,10 @@ export const syncService = {
         return {
           ...configData,
           products: productsList,
-          categories: configData.categories || [],
-          tennisBrands: configData.tennisBrands || [],
-          socksBrands: configData.socksBrands || [],
-          logo: configData.logo || null,
           lastUpdated: configData.lastUpdated || Date.now()
         } as GlobalState;
       }
-      
-      // Si no existe el config, al menos devolvemos los productos si hay
-      if (productsList.length > 0) {
-        return {
-          products: productsList,
-          categories: [],
-          tennisBrands: [],
-          socksBrands: [],
-          logo: null,
-          lastUpdated: Date.now()
-        };
-      }
-
-      return null;
+      return productsList.length > 0 ? { products: productsList, categories: [], tennisBrands: [], socksBrands: [], logo: null, lastUpdated: Date.now() } : null;
     } catch (error) {
       console.error('Firebase Fetch Error:', error);
       return null;
@@ -137,7 +127,6 @@ export const syncService = {
   pushState: async (state: GlobalState): Promise<boolean> => {
     try {
       const docRef = doc(db, "config", "global_state");
-      // Omitimos el array de productos del estado global para evitar límites de tamaño
       const { products, ...restOfState } = state;
       await setDoc(docRef, { ...restOfState, lastUpdated: Date.now() });
       return true;
