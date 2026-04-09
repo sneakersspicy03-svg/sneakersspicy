@@ -168,34 +168,42 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     try {
       const oldData = await import('../old_constants_migrate');
       
-      // 1. Migrar Banners de Tenis
-      for (const b of oldData.TENNIS_BRANDS) {
-        const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_tennis_${b.name}`);
-        onAddTennisBrand({ ...b, marqueeImage: url, availableSizes: [] });
+      // 1. Migrar Banners de Tenis (Calzado)
+      if (oldData.TENNIS_BRANDS) {
+        for (const b of oldData.TENNIS_BRANDS) {
+          const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_tennis_${b.name}`);
+          onAddTennisBrand({ ...b, marqueeImage: url, availableSizes: b.availableSizes || [] });
+        }
       }
       
       // 2. Migrar Banners de Medias
-      for (const b of oldData.SOCKS_BRANDS) {
-        const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_socks_${b.name}`);
-        onAddSocksBrand({ ...b, marqueeImage: url, availableSizes: [] });
+      if (oldData.SOCKS_BRANDS) {
+        for (const b of oldData.SOCKS_BRANDS) {
+          const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_socks_${b.name}`);
+          onAddSocksBrand({ ...b, marqueeImage: url, availableSizes: b.availableSizes || [] });
+        }
       }
       
       // 3. Migrar Categorías Sportwear
-      for (const c of oldData.SPORTWEAR_CATEGORIES) {
-        const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`);
-        onAddCategory({ ...c, image: url });
+      if (oldData.SPORTWEAR_CATEGORIES) {
+        for (const c of oldData.SPORTWEAR_CATEGORIES) {
+          const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`);
+          onAddCategory({ ...c, image: url });
+        }
       }
 
       // 4. Migrar Productos
-      for (const p of oldData.PRODUCTS) {
-        await syncService.saveProduct(p);
+      if (oldData.PRODUCTS) {
+        for (const p of oldData.PRODUCTS) {
+          await syncService.saveProduct(p);
+        }
       }
       
-      alert("✅ Migración Épica Completada: Banners y Productos en la nube.");
+      alert("✅ Migración Completa: Calzado, Sportwear, Medias y Productos inyectados.");
       if (onLoadTestData) await onLoadTestData();
     } catch (e) {
       console.error(e);
-      alert("❌ Error en la gran migración.");
+      alert("❌ Error en la migración.");
     } finally {
       setIsMigrating(false);
     }
@@ -320,11 +328,11 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {list.map((item: any, idx) => (
                         <div key={idx} className="bg-black/60 p-5 rounded-3xl border border-white/5 group relative hover:border-red-600/40 transition-all">
-                          <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-all z-10">
-                            <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-2 bg-blue-600/20 hover:bg-blue-600 text-blue-500 hover:text-white rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                            <button onClick={() => { if(confirm('¿Borrar?')) { if(section === 'Calzado') onDeleteTennisBrand(item.name); else if(section === 'Medias') onDeleteSocksBrand(item.name); else onDeleteCategory(item.name); } }} className="p-2 bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                          <div className="absolute top-4 right-4 flex space-x-2 z-20">
+                            <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                            <button onClick={() => { if(confirm('¿Borrar permanentemente?')) { if(section === 'Calzado') onDeleteTennisBrand(item.name); else if(section === 'Medias') onDeleteSocksBrand(item.name); else onDeleteCategory(item.name); } }} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                           </div>
-                          <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4">
+                          <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4 relative">
                             <img src={item.marqueeImage || item.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
                           </div>
                           <p className="text-[10px] font-black uppercase text-white truncate">{item.bannerTitle || item.name}</p>
