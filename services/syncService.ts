@@ -30,13 +30,25 @@ export interface GlobalState {
 
 export const syncService = {
   uploadImage: async (base64Data: string, fileName: string): Promise<string> => {
-    if (!base64Data.startsWith('data:image/')) return base64Data;
+    if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     try {
       const storageRef = ref(storage, `products/${fileName}`);
       await uploadString(storageRef, base64Data, 'data_url');
       return await getDownloadURL(storageRef);
     } catch (error) {
       console.error('Storage Upload Error:', error);
+      return base64Data;
+    }
+  },
+
+  uploadBannerImage: async (base64Data: string, bannerName: string): Promise<string> => {
+    if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
+    try {
+      const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}`);
+      await uploadString(storageRef, base64Data, 'data_url');
+      return await getDownloadURL(storageRef);
+    } catch (error) {
+      console.error('Banner Storage Error:', error);
       return base64Data;
     }
   },

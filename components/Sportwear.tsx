@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { SportwearCategory, Product } from '../types';
 
@@ -19,7 +18,14 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
       <div className="relative z-10 w-full max-w-[1600px] mx-auto">
         <div className="px-6 md:px-20 mb-12 space-y-8 animate-fade-in">
           <div className="space-y-2">
-...
+            <div className="flex items-center space-x-4">
+              <span className="w-12 h-[1px] bg-red-500/50"></span>
+              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">Performance Collection</span>
+            </div>
+            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">Sport<span className="text-white/20">wear</span></h2>
+          </div>
+        </div>
+
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {categories.map((cat, index) => {
