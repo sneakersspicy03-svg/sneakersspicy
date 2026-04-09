@@ -24,6 +24,7 @@ interface DeveloperModeProps {
   onToggleStock: (id: string, s?: number | string) => Promise<void>;
   onLoadTestData?: () => Promise<void>;
   onClearInventory?: () => Promise<void>;
+  onClearBanners?: () => Promise<void>;
   
   onAddTennisBrand: (b: BrandStock) => void;
   onDeleteTennisBrand: (name: string) => void;
@@ -47,7 +48,7 @@ const CLOTHING_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
 const DeveloperMode: React.FC<DeveloperModeProps> = ({ 
   logo, onUpdateLogo, whatsappTemplate, onUpdateWhatsAppTemplate, isOpen, onClose, products, categories, tennisBrands, socksBrands, isAuthorized, initialBrand, initialType, onLoginSuccess, onLogout, onAddProduct, onUpdateProduct, onDeleteProduct, onToggleStock, 
-  onLoadTestData, onClearInventory,
+  onLoadTestData, onClearInventory, onClearBanners,
   onAddTennisBrand, onDeleteTennisBrand, onUpdateTennisBrand,
   onAddSocksBrand, onDeleteSocksBrand, onUpdateSocksBrand,
   onAddCategory, onDeleteCategory, onUpdateCategory,
@@ -359,7 +360,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                             </button>
                           </div>
                           <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4 relative">
-                            <img src={item.marqueeImage || item.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+                            <img src={item.marqueeImage || item.image} className="w-full h-full object-cover transition-all duration-500" />
                           </div>
                           <p className="text-[10px] font-black uppercase text-white truncate">{item.bannerTitle || item.name}</p>
                           <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest truncate">{item.bannerSubtitle || 'SIN SUBTÍTULO'}</p>
@@ -386,6 +387,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <textarea value={whatsappTemplate} onChange={(e) => onUpdateWhatsAppTemplate(e.target.value)} className="w-full bg-black border border-white/10 p-6 rounded-3xl text-xs font-bold h-44 resize-none" />
                   <button onClick={migrateHistoricalData} disabled={isMigrating} className="w-full mt-4 py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50">
                     {isMigrating ? "Migrando Banners..." : "⚡ Migrar Banners Históricos (GitHub)"}
+                  </button>
+                  <button onClick={onClearBanners} className="w-full mt-2 py-4 bg-red-600/20 border border-red-500/30 text-red-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">
+                    🗑️ Borrar Todos los Banners
                   </button>
                 </div>
               </div>

@@ -311,6 +311,15 @@ const App: React.FC = () => {
             }
           }
         }}
+        onClearBanners={async () => {
+          if(confirm("⚠️ ¿Estás SEGURO de borrar TODOS los banners?")) {
+            setTennisBrands([]);
+            setSocksBrands([]);
+            setCurrentCategories([]);
+            await publishState({ tennisBrands: [], socksBrands: [], categories: [], logo: customLogo });
+            alert("🧹 Todos los banners han sido eliminados.");
+          }
+        }}
         />
         </div>
   );
