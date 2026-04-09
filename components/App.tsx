@@ -221,14 +221,46 @@ const App: React.FC = () => {
           }
         }}
         onAddTennisBrand={nb => { const updated = [...tennisBrands, nb]; setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
-        onDeleteTennisBrand={name => { const updated = tennisBrands.filter(b => b.name !== name); setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
-        onUpdateTennisBrand={ub => { const updated = tennisBrands.map(b => b.name === ub.name ? ub : b); setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
-        onAddSocksBrand={nb => { const updated = [...socksBrands, nb]; setSocksBrands(updated); publishState({ socksBrands: updated }); }}
-        onDeleteSocksBrand={name => { const updated = socksBrands.filter(b => b.name !== name); setSocksBrands(updated); publishState({ socksBrands: updated }); }}
-        onUpdateSocksBrand={ub => { const updated = socksBrands.map(b => b.name === ub.name ? ub : b); setSocksBrands(updated); publishState({ socksBrands: updated }); }}
-        onAddCategory={nc => { const updated = [...currentCategories, nc]; setCurrentCategories(updated); publishState({ categories: updated }); }}
-        onDeleteCategory={name => { const updated = currentCategories.filter(c => c.name !== name); setCurrentCategories(updated); publishState({ categories: updated }); }}
-        onUpdateCategory={uc => { const updated = currentCategories.map(c => c.name === uc.name ? uc : c); setCurrentCategories(updated); publishState({ categories: updated }); }}
+        onDeleteTennisBrand={name => { 
+          const updated = tennisBrands.filter(b => b.name !== name); 
+          setTennisBrands(updated); 
+          publishState({ tennisBrands: updated, socksBrands, categories: currentCategories, logo: customLogo }); 
+        }}
+        onUpdateTennisBrand={ub => { 
+          const updated = tennisBrands.map(b => b.name === ub.name ? ub : b); 
+          setTennisBrands(updated); 
+          publishState({ tennisBrands: updated, socksBrands, categories: currentCategories, logo: customLogo }); 
+        }}
+        onAddSocksBrand={nb => { 
+          const updated = [...socksBrands, nb]; 
+          setSocksBrands(updated); 
+          publishState({ socksBrands: updated, tennisBrands, categories: currentCategories, logo: customLogo }); 
+        }}
+        onDeleteSocksBrand={name => { 
+          const updated = socksBrands.filter(b => b.name !== name); 
+          setSocksBrands(updated); 
+          publishState({ socksBrands: updated, tennisBrands, categories: currentCategories, logo: customLogo }); 
+        }}
+        onUpdateSocksBrand={ub => { 
+          const updated = socksBrands.map(b => b.name === ub.name ? ub : b); 
+          setSocksBrands(updated); 
+          publishState({ socksBrands: updated, tennisBrands, categories: currentCategories, logo: customLogo }); 
+        }}
+        onAddCategory={nc => { 
+          const updated = [...currentCategories, nc]; 
+          setCurrentCategories(updated); 
+          publishState({ categories: updated, tennisBrands, socksBrands, logo: customLogo }); 
+        }}
+        onDeleteCategory={name => { 
+          const updated = currentCategories.filter(c => c.name !== name); 
+          setCurrentCategories(updated); 
+          publishState({ categories: updated, tennisBrands, socksBrands, logo: customLogo }); 
+        }}
+        onUpdateCategory={uc => { 
+          const updated = currentCategories.map(c => c.name === uc.name ? uc : c); 
+          setCurrentCategories(updated); 
+          publishState({ categories: updated, tennisBrands, socksBrands, logo: customLogo }); 
+        }}
         onReorderTennis={(s, t) => { const list = [...tennisBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setTennisBrands(list); publishState({ tennisBrands: list }); }}
         onReorderSocks={(s, t) => { const list = [...socksBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setSocksBrands(list); publishState({ socksBrands: list }); }}
         onReorderCategory={(s, t) => { const list = [...currentCategories]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setCurrentCategories(list); publishState({ categories: list }); }}

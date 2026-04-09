@@ -7,13 +7,21 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family: 'ExtraBlackOblique';
+      src: local('Arial Black');
+    }
     body { background-color: #000; color: #fff; margin: 0; font-family: 'Inter', sans-serif; }
     h1, h2, h3, .font-premium { 
-      font-family: "Arial Black", "Arial Bold", Gadget, sans-serif !important; 
+      font-family: "Arial Black", sans-serif !important; 
+      font-weight: 900 !important;
       font-style: italic !important;
       text-transform: uppercase;
+      letter-spacing: -0.05em;
+      transform: skewX(-5deg); /* Simula el Oblique extremo */
+      display: inline-block;
     }
     #root { min-height: 100vh; }
     ::-webkit-scrollbar { width: 6px; }
