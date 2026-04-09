@@ -99,6 +99,15 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     }
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => onUpdateLogo(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProduct = async () => {
     let finalSizes: (string | number)[] = [];
     if (addType === 'shoes') finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
