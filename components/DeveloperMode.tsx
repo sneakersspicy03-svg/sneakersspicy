@@ -136,14 +136,28 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     setIsSaving(true);
     try {
       const imageUrl = await syncService.uploadBannerImage(newBannerData.image, newBannerData.name);
-      const common = { name: newBannerData.name, marqueeImage: imageUrl, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle };
       
-      if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: newBannerData.name[0], availableSizes: [] });
-      else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: newBannerData.name[0], availableSizes: [] });
+      // Filtro estricto de tallas según sección
+      let sizes: (string | number)[] = [];
+      if (showAddBannerForm.section === 'Calzado') {
+        // Solo números (simulamos un catálogo base para la marca nueva)
+        sizes = [7, 8, 9, 10, 11, 12];
+      } else if (showAddBannerForm.section === 'Sportwear') {
+        // Solo letras
+        sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+      } else {
+        // Medias siempre Talla Única
+        sizes = ['Talla Única'];
+      }
+
+      const common = { name: newBannerData.name, marqueeImage: imageUrl, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
+      
+      if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: newBannerData.name[0] });
+      else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: newBannerData.name[0] });
       else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: imageUrl });
       
       setShowAddBannerForm({section: null}); setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
-      alert("✅ Banner creado.");
+      alert("✅ Banner creado con tallas segregadas.");
     } finally { setIsSaving(false); }
   };
 
@@ -330,7 +344,19 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                         <div key={idx} className="bg-black/60 p-5 rounded-3xl border border-white/5 group relative hover:border-red-600/40 transition-all">
                           <div className="absolute top-4 right-4 flex space-x-2 z-20">
                             <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                            <button onClick={() => { if(confirm('¿Borrar permanentemente?')) { if(section === 'Calzado') onDeleteTennisBrand(item.name); else if(section === 'Medias') onDeleteSocksBrand(item.name); else onDeleteCategory(item.name); } }} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation();
+                                if(confirm('¿Borrar permanentemente?')) { 
+                                  if(section === 'Calzado') onDeleteTennisBrand(item.name); 
+                                  else if(section === 'Medias') onDeleteSocksBrand(item.name); 
+                                  else onDeleteCategory(item.name); 
+                                } 
+                              }} 
+                              className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xl"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
+                            </button>
                           </div>
                           <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4 relative">
                             <img src={item.marqueeImage || item.image} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />

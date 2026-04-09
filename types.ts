@@ -37,15 +37,16 @@ export interface ChatMessage {
   timestamp: number;
   links?: { title: string; uri: string }[];
 }
-
 export interface BrandStock {
   name: string;
   logo: string;
-  availableSizes: number[];
+  availableSizes: (number | string)[];
   marqueeImage: string;
+  brand?: string;
   bannerTitle?: string;    // Texto en blanco
   bannerSubtitle?: string; // Texto en gris/badge
 }
+
 
 export interface SportwearCategory {
   name: string;
