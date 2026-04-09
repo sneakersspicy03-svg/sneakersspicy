@@ -167,17 +167,6 @@ const App: React.FC = () => {
             {filteredProducts.map(p => <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} onClick={() => setSelectedProduct(p)} />)}
           </div>
         </section>
-
-        {/* Floating AI Trigger */}
-        <button 
-          onClick={() => setIsAIExpertOpen(true)}
-          className="fixed bottom-8 right-8 z-50 w-16 h-16 bg-red-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-white/20 scale-0 group-hover:scale-100 transition-transform duration-500 rounded-full"></div>
-          <svg className="w-8 h-8 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-          </svg>
-        </button>
       </main>
 
       <Cart whatsappTemplate={whatsappTemplate} logo={customLogo} isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cartItems} onRemove={(id, s) => setCartItems(prev => prev.filter(i => !(i.id === id && String(i.selectedSize) === String(s))))} onUpdateQuantity={(id, s, d) => setCartItems(prev => prev.map(i => (i.id === id && String(i.selectedSize) === String(s)) ? { ...i, quantity: Math.max(1, i.quantity + d) } : i))} onClearCart={() => setCartItems([])} />

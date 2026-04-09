@@ -168,23 +168,37 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     try {
       const oldData = await import('../old_constants_migrate');
       
+      // 1. Migrar Banners de Tenis
       for (const b of oldData.TENNIS_BRANDS) {
-        const url = await syncService.uploadBannerImage(b.marqueeImage, b.name);
+        const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_tennis_${b.name}`);
         onAddTennisBrand({ ...b, marqueeImage: url, availableSizes: [] });
       }
+      
+      // 2. Migrar Banners de Medias
       for (const b of oldData.SOCKS_BRANDS) {
-        const url = await syncService.uploadBannerImage(b.marqueeImage, b.name);
+        const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_socks_${b.name}`);
         onAddSocksBrand({ ...b, marqueeImage: url, availableSizes: [] });
       }
+      
+      // 3. Migrar Categorías Sportwear
       for (const c of oldData.SPORTWEAR_CATEGORIES) {
-        const url = await syncService.uploadBannerImage(c.image, c.name);
+        const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`);
         onAddCategory({ ...c, image: url });
       }
-      for (const p of oldData.PRODUCTS) await syncService.saveProduct(p);
+
+      // 4. Migrar Productos
+      for (const p of oldData.PRODUCTS) {
+        await syncService.saveProduct(p);
+      }
       
-      alert("🔥 Migración completa: Banners y Productos inyectados.");
+      alert("✅ Migración Épica Completada: Banners y Productos en la nube.");
       if (onLoadTestData) await onLoadTestData();
-    } catch (e) { alert("❌ Error en migración."); } finally { setIsMigrating(false); }
+    } catch (e) {
+      console.error(e);
+      alert("❌ Error en la gran migración.");
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   const shoesInv = products.filter(p => p.category === 'Shoes');
