@@ -74,7 +74,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
-  // Función de compresión de imágenes
+  // Función de compresión de imágenes optimizada (< 400KB)
   const compressImage = (base64: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -94,7 +94,17 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7));
+        
+        let quality = 0.7;
+        let result = canvas.toDataURL('image/jpeg', quality);
+        
+        // Ajuste iterativo para asegurar < 400KB
+        while (result.length * 0.75 > 400 * 1024 && quality > 0.1) {
+          quality -= 0.05;
+          result = canvas.toDataURL('image/jpeg', quality);
+        }
+        
+        resolve(result);
       };
     });
   };
@@ -150,19 +160,20 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
     if (!newProduct.name || !newProduct.brand || !newProduct.price || !newProduct.images.front) return alert("⚠️ Faltan datos críticos.");
     
-    setIsSaving(true);
-    try {
-      const product: Product = {
-        id: `spicy-${Date.now()}`, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }
-      };
-      await onAddProduct(product);
-      alert("✅ Producto subido.");
-      setActiveTab('inventory');
-      setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
-      setSizesText('');
-      setSelectedSportwearSizes([]);
-    } finally { setIsSaving(false); }
+    // UI OPTIMISTA: Cerramos y limpiamos de inmediato
+    const product: Product = {
+      id: `spicy-${Date.now()}`, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }
+    };
+    
+    // No esperamos al await para la UI
+    onAddProduct(product); 
+    setActiveTab('inventory');
+    setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
+    setSizesText('');
+    setSelectedSportwearSizes([]);
+    // El feedback visual de sincronización lo maneja el componente App
   };
+
 
   const handleSaveNewBanner = async () => {
     if (!newBannerData.name || !newBannerData.image) return alert("⚠️ Nombre e imagen obligatorios.");

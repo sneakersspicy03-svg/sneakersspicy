@@ -182,14 +182,22 @@ const App: React.FC = () => {
         isAuthorized={isAdminAuthorized} initialBrand={initialDevBrand} initialType={initialDevType}
         onLoginSuccess={() => { setIsAdminAuthorized(true); setIsDevMode(true); }}
         onAddProduct={async np => { 
+          // ACTUALIZACIÓN OPTIMISTA: Mostrar de inmediato
+          const previousProducts = [...currentProducts];
+          const optimisticList = [np, ...currentProducts];
+          setCurrentProducts(optimisticList);
+          
           try {
             setIsPublishing(true);
             const savedProduct = await syncService.saveProduct(np);
-            const updated = [savedProduct, ...currentProducts]; 
-            setCurrentProducts(updated); 
-            await publishState({ products: updated }); 
+            // Reemplazar el optimista con el real (que tiene las URLs definitivas de Firebase)
+            const finalizedList = optimisticList.map(p => p.id === np.id ? savedProduct : p);
+            setCurrentProducts(finalizedList); 
+            await publishState({ products: finalizedList }); 
           } catch (e) {
-            alert("Error al guardar el producto.");
+            console.error("Error guardando producto:", e);
+            setCurrentProducts(previousProducts); // Revertir en caso de error
+            alert("❌ Error crítico: No se pudo sincronizar el producto con la nube.");
           } finally {
             setIsPublishing(false);
           }
