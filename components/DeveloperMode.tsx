@@ -134,15 +134,35 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const handleSaveNewBanner = () => {
     if (!newBannerData.name || !newBannerData.image) return alert("⚠️ Nombre e imagen obligatorios.");
-    if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ name: newBannerData.name, logo: newBannerData.name[0], availableSizes: [7, 8, 9, 10, 11, 12], marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle });
-    else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ name: newBannerData.name, logo: newBannerData.name[0], availableSizes: [8, 9, 10], marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle });
+    if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ name: newBannerData.name, logo: newBannerData.name[0], availableSizes: [], marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle });
+    else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ name: newBannerData.name, logo: newBannerData.name[0], availableSizes: [], marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle });
     else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ name: newBannerData.name, brand: newBannerData.brand || 'Nike', image: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle });
     setShowAddBannerForm({section: null}); setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
+    alert("✅ Banner creado.");
   };
 
   const shoesInv = products.filter(p => p.category === 'Shoes');
   const clothesInv = products.filter(p => p.category === 'Sportwear');
   const socksInv = products.filter(p => p.category === 'Medias');
+
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  const migrateHistoricalData = async () => {
+    setIsMigrating(true);
+    try {
+      const oldData = await import('../old_constants');
+      for (const p of oldData.PRODUCTS) await syncService.saveProduct(p);
+      for (const b of oldData.TENNIS_BRANDS) onAddTennisBrand(b);
+      for (const b of oldData.SOCKS_BRANDS) onAddSocksBrand(b);
+      for (const c of oldData.SPORTWEAR_CATEGORIES) onAddCategory(c);
+      alert("✅ Migración del catálogo histórico completada.");
+      if (onLoadTestData) await onLoadTestData();
+    } catch (e) {
+      alert("❌ Error en migración.");
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -297,6 +317,14 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                 <div className="space-y-6">
                   <label className="text-[11px] font-[1000] text-zinc-500 uppercase tracking-[0.3em] block">Soporte WhatsApp</label>
                   <textarea value={whatsappTemplate} onChange={(e) => onUpdateWhatsAppTemplate(e.target.value)} className="w-full bg-black border border-white/10 p-6 rounded-3xl text-xs font-bold h-44 resize-none text-zinc-300 focus:border-red-600 transition-all shadow-inner" />
+                  
+                  <button 
+                    onClick={migrateHistoricalData}
+                    disabled={isMigrating}
+                    className="w-full mt-4 py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50"
+                  >
+                    {isMigrating ? "Migrando Catálogo..." : "⚡ Migrar Catálogo Histórico (GitHub)"}
+                  </button>
                 </div>
               </div>
             </div>

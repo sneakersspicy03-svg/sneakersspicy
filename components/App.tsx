@@ -154,9 +154,9 @@ const App: React.FC = () => {
       />
 
       <main className="pb-20">
-        <Hero brands={tennisBrands} onBrandSelect={setActiveBrand} activeBrand={activeBrand} isDevMode={isDevMode} onSelectSize={handleSelectSize} onQuickAdd={(b) => handleQuickAdd(b, 'shoes')} />
-        <Sportwear categories={currentCategories} onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => handleQuickAdd(b, 'sportwear')} />
-        <Socks brands={socksBrands} onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => handleQuickAdd(b, 'socks')} />
+        <Hero brands={tennisBrands} products={currentProducts} onBrandSelect={setActiveBrand} activeBrand={activeBrand} isDevMode={isDevMode} onSelectSize={handleSelectSize} onQuickAdd={(b) => handleQuickAdd(b, 'shoes')} />
+        <Sportwear categories={currentCategories} products={currentProducts} onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => handleQuickAdd(b, 'sportwear')} />
+        <Socks brands={socksBrands} products={currentProducts} onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => handleQuickAdd(b, 'socks')} />
         
         <section id="product-grid" className="px-6 md:px-20 py-24 scroll-mt-24">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">

@@ -1,18 +1,20 @@
 
 import React from 'react';
-import { BrandStock } from '../types';
+import { BrandStock, Product } from '../types';
 
 interface HeroProps {
   brands: BrandStock[];
+  products: Product[];
   onBrandSelect: (brand: BrandStock) => void;
   activeBrand: BrandStock | null;
   isDevMode?: boolean;
   onQuickAdd?: (brandName: string) => void;
-  onSelectSize?: (brand: string, size: number) => void;
+  onSelectSize?: (brand: string, size: number | string) => void;
 }
 
 const Hero: React.FC<HeroProps> = ({ 
   brands,
+  products,
   onBrandSelect, 
   activeBrand, 
   isDevMode = false,
@@ -42,56 +44,63 @@ const Hero: React.FC<HeroProps> = ({
 
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {brands.map((brand) => (
-              <div
-                key={brand.name}
-                onClick={() => onBrandSelect(brand)}
-                className={`relative h-[50vh] md:h-[60vh] rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
-              >
-                <img src={brand.marqueeImage} alt={brand.name} className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-110" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-opacity duration-700"></div>
-                
-                <div className="absolute inset-x-0 bottom-0 p-8 md:p-10 flex flex-col items-start space-y-3 transition-all duration-500 group-hover:opacity-0 group-hover:translate-y-4">
-                  {brand.bannerSubtitle && (
-                    <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 mb-1 italic">
-                      {brand.bannerSubtitle}
-                    </span>
-                  )}
-                  <h3 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white leading-none">
-                    {brand.bannerTitle || brand.name}
-                  </h3>
-                </div>
+            {brands.map((brand) => {
+              // Calcular tallas dinámicas
+              const brandProducts = products.filter(p => p.brand === brand.name && !p.isSoldOut);
+              const allSizes = brandProducts.flatMap(p => p.availableSizes);
+              const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => Number(a) - Number(b));
 
-                <div className="absolute inset-0 bg-black/80 backdrop-blur-xl transition-all duration-700 flex flex-col items-center justify-center p-8 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 z-[60]">
-                  <div className="text-center space-y-5 w-full max-w-[280px]">
-                    <span className="text-red-500 text-[9px] font-black uppercase tracking-[0.5em] block">Filtrar por Talla</span>
-                    
-                    <div className="grid grid-cols-4 gap-2 w-full mx-auto relative">
-                      {(brand.availableSizes || []).map(size => (
-                        <button 
-                          key={size}
-                          onClick={(e) => { e.stopPropagation(); onSelectSize?.(brand.name, size); }}
-                          className="aspect-square rounded-xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all text-[11px] font-black italic z-10"
-                        >
-                          {size}
-                        </button>
-                      ))}
-                      {isDevMode && (
-                        <button 
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            if(onQuickAdd) onQuickAdd(brand.name); 
-                          }}
-                          className="aspect-square rounded-xl border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 transition-all cursor-pointer z-[70]"
-                        >
-                          <span className="text-xl font-bold">+</span>
-                        </button>
-                      )}
+              return (
+                <div
+                  key={brand.name}
+                  onClick={() => onBrandSelect(brand)}
+                  className={`relative h-[50vh] md:h-[60vh] rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
+                >
+                  <img src={brand.marqueeImage} alt={brand.name} className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-110" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-opacity duration-700"></div>
+                  
+                  <div className="absolute inset-x-0 bottom-0 p-8 md:p-10 flex flex-col items-start space-y-3 transition-all duration-500 group-hover:opacity-0 group-hover:translate-y-4">
+                    {brand.bannerSubtitle && (
+                      <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 mb-1 italic">
+                        {brand.bannerSubtitle}
+                      </span>
+                    )}
+                    <h3 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white leading-none">
+                      {brand.bannerTitle || brand.name}
+                    </h3>
+                  </div>
+
+                  <div className="absolute inset-0 bg-black/80 backdrop-blur-xl transition-all duration-700 flex flex-col items-center justify-center p-8 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 z-[60]">
+                    <div className="text-center space-y-5 w-full max-w-[280px]">
+                      <span className="text-red-500 text-[9px] font-black uppercase tracking-[0.5em] block">Filtrar por Talla</span>
+                      
+                      <div className="grid grid-cols-4 gap-2 w-full mx-auto relative">
+                        {dynamicSizes.map(size => (
+                          <button 
+                            key={size}
+                            onClick={(e) => { e.stopPropagation(); onSelectSize?.(brand.name, size); }}
+                            className="aspect-square rounded-xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all text-[11px] font-black italic z-10"
+                          >
+                            {size}
+                          </button>
+                        ))}
+                        {isDevMode && (
+                          <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              if(onQuickAdd) onQuickAdd(brand.name); 
+                            }}
+                            className="aspect-square rounded-xl border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 transition-all cursor-pointer z-[70]"
+                          >
+                            <span className="text-xl font-bold">+</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

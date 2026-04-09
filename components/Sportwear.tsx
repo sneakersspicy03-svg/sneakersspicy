@@ -1,18 +1,17 @@
 
 import React from 'react';
-import { SportwearCategory } from '../types';
+import { SportwearCategory, Product } from '../types';
 
 interface SportwearProps {
   categories: SportwearCategory[];
+  products: Product[];
   onCategorySelect: (brand: string, category: string) => void;
   onSelectSize?: (brand: string, size: string, category: string) => void;
   onQuickAdd?: (brand: string) => void;
   isDevMode?: boolean;
 }
 
-const SPORTWEAR_SIZES = ['L', 'XL', 'XXL'];
-
-const Sportwear: React.FC<SportwearProps> = ({ categories, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false }) => {
+const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false }) => {
   if (!categories || !Array.isArray(categories)) return null;
 
   return (
@@ -20,19 +19,17 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, onCategorySelect, onS
       <div className="relative z-10 w-full max-w-[1600px] mx-auto">
         <div className="px-6 md:px-20 mb-12 space-y-8 animate-fade-in">
           <div className="space-y-2">
-            <div className="flex items-center space-x-4">
-              <span className="w-12 h-[1px] bg-red-500/50"></span>
-              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">Performance Collection</span>
-            </div>
-            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">Sport<span className="text-white/20">wear</span></h2>
-          </div>
-        </div>
-
+...
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {categories.map((cat, index) => {
               const brandName = (cat.brand || 'Nike').toUpperCase();
               const title = cat.bannerTitle || cat.name;
+
+              // Calcular tallas dinámicas
+              const brandProducts = products.filter(p => p.brand === cat.brand && p.category === cat.name && !p.isSoldOut);
+              const allSizes = brandProducts.flatMap(p => p.availableSizes);
+              const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 
               return (
                 <div
@@ -61,8 +58,8 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, onCategorySelect, onS
                           <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">Seleccionar Talla</p>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                          {SPORTWEAR_SIZES.map(size => (
-                            <button key={size} onClick={(e) => { e.stopPropagation(); onSelectSize?.(cat.brand || 'Nike', size, cat.name); }} className="aspect-square rounded-2xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white transition-all text-sm font-black italic">{size}</button>
+                          {dynamicSizes.map(size => (
+                            <button key={size} onClick={(e) => { e.stopPropagation(); onSelectSize?.(cat.brand || 'Nike', String(size), cat.name); }} className="aspect-square rounded-2xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white transition-all text-sm font-black italic">{size}</button>
                           ))}
                           {isDevMode && (
                             <button onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(cat.brand || 'Nike'); }} className="aspect-square rounded-2xl border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"><span className="text-xl font-bold">+</span></button>
