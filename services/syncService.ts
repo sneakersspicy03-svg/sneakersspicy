@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc } from "firebase/firestore";
-import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, getDownloadURL, uploadBytesResumable } from "firebase/storage";
 import { Product, SportwearCategory, BrandStock } from '../types';
 
 const firebaseConfig = { 
@@ -28,13 +28,50 @@ export interface GlobalState {
   lastUpdated: number;
 }
 
+const base64ToBlob = (base64: string): Blob => {
+  const parts = base64.split(';base64,');
+  const contentType = parts[0].split(':')[1];
+  const raw = window.atob(parts[1]);
+  const rawLength = raw.length;
+  const uInt8Array = new Uint8Array(rawLength);
+  for (let i = 0; i < rawLength; ++i) {
+    uInt8Array[i] = raw.charCodeAt(i);
+  }
+  return new Blob([uInt8Array], { type: contentType });
+};
+
 export const syncService = {
-  uploadImage: async (base64Data: string, fileName: string): Promise<string> => {
+  uploadImage: async (
+    base64Data: string, 
+    fileName: string, 
+    onProgress?: (progress: number, timeRemaining: number) => void
+  ): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
+    
     try {
       const storageRef = ref(storage, `products/${fileName}`);
-      await uploadString(storageRef, base64Data, 'data_url');
-      return await getDownloadURL(storageRef);
+      const blob = base64ToBlob(base64Data);
+      const uploadTask = uploadBytesResumable(storageRef, blob);
+      const startTime = Date.now();
+
+      return new Promise((resolve, reject) => {
+        uploadTask.on('state_changed', 
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            const elapsed = (Date.now() - startTime) / 1000;
+            const speed = snapshot.bytesTransferred / elapsed; // bytes/sec
+            const remainingBytes = snapshot.totalBytes - snapshot.bytesTransferred;
+            const timeRemaining = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
+            
+            if (onProgress) onProgress(progress, timeRemaining);
+          }, 
+          (error) => reject(error), 
+          async () => {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(downloadURL);
+          }
+        );
+      });
     } catch (error) {
       console.error('Storage Upload Error:', error);
       return base64Data;
@@ -45,7 +82,9 @@ export const syncService = {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     try {
       const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}`);
-      await uploadString(storageRef, base64Data, 'data_url');
+      const blob = base64ToBlob(base64Data);
+      const uploadTask = uploadBytesResumable(storageRef, blob);
+      await uploadTask;
       return await getDownloadURL(storageRef);
     } catch (error) {
       console.error('Banner Storage Error:', error);
@@ -53,19 +92,48 @@ export const syncService = {
     }
   },
 
-  saveProduct: async (product: Product): Promise<Product> => {
+  saveProduct: async (
+    product: Product, 
+    onProgress?: (progress: number, timeRemaining: number) => void
+  ): Promise<Product> => {
     try {
-      // Proceso de Erradicación de Base64: Forzar URLs de Storage
+      // Cálculo de peso total para progreso unificado (aproximado)
       let mainImageUrl = product.image;
+      const imagesToUpload = [];
+      
       if (mainImageUrl.startsWith('data:image/')) {
-        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main`);
+        imagesToUpload.push({ key: 'main', val: mainImageUrl });
+      }
+      
+      if (product.images) {
+        for (const [key, val] of Object.entries(product.images)) {
+          if (typeof val === 'string' && val.startsWith('data:image/')) {
+            imagesToUpload.push({ key, val });
+          }
+        }
+      }
+
+      let completedUploads = 0;
+      const totalUploads = imagesToUpload.length;
+
+      const handleInternalProgress = (p: number, tr: number) => {
+        if (onProgress) {
+          const overallProgress = ((completedUploads + (p / 100)) / totalUploads) * 100;
+          onProgress(overallProgress, tr);
+        }
+      };
+
+      if (mainImageUrl.startsWith('data:image/')) {
+        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main`, handleInternalProgress);
+        completedUploads++;
       }
       
       const updatedImages: any = {};
       if (product.images) {
         for (const [key, val] of Object.entries(product.images)) {
           if (typeof val === 'string' && val.startsWith('data:image/')) {
-            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}`);
+            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}`, handleInternalProgress);
+            completedUploads++;
           } else {
             updatedImages[key] = val;
           }

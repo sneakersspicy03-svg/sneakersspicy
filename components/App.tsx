@@ -182,21 +182,8 @@ const App: React.FC = () => {
         isAuthorized={isAdminAuthorized} initialBrand={initialDevBrand} initialType={initialDevType}
         onLoginSuccess={() => { setIsAdminAuthorized(true); setIsDevMode(true); }}
         onAddProduct={async np => { 
-          const previousProducts = [...currentProducts];
-          const optimisticList = [np, ...currentProducts];
-          setCurrentProducts(optimisticList);
-          try {
-            setIsPublishing(true);
-            const savedProduct = await syncService.saveProduct(np);
-            const finalizedList = optimisticList.map(p => p.id === np.id ? savedProduct : p);
-            setCurrentProducts(finalizedList); 
-            await publishState({ products: finalizedList }); 
-          } catch (e) {
-            setCurrentProducts(previousProducts);
-            alert("❌ Error crítico: No se pudo sincronizar el producto.");
-          } finally {
-            setIsPublishing(false);
-          }
+          // ACTUALIZACIÓN PURAMENTE OPTIMISTA: El componente DeveloperMode manejará la cola real
+          setCurrentProducts(prev => [np, ...prev]);
         }}
         onDeleteProduct={async id => { 
           try {

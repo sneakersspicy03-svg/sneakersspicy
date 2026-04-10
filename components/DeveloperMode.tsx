@@ -74,6 +74,45 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
+  // Estados de Cola de Subida
+  const [uploadQueue, setUploadQueue] = useState<Product[]>([]);
+  const [activeUpload, setActiveUpload] = useState<Product | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadETA, setUploadETA] = useState<number | null>(null);
+
+  // Efecto de Procesamiento de Cola
+  useEffect(() => {
+    const processQueue = async () => {
+      if (activeUpload || uploadQueue.length === 0) return;
+
+      const nextProduct = uploadQueue[0];
+      setUploadQueue(prev => prev.slice(1));
+      setActiveUpload(nextProduct);
+      setUploadProgress(0);
+      setUploadETA(null);
+
+      try {
+        const savedProduct = await syncService.saveProduct(nextProduct, (progress, eta) => {
+          setUploadProgress(progress);
+          setUploadETA(eta);
+        });
+        
+        // Actualizar el producto en el padre con la versión que tiene URLs de Storage
+        await onUpdateProduct(savedProduct);
+        console.log(`✅ Upload complete: ${savedProduct.name}`);
+      } catch (error) {
+        console.error("❌ Queue Upload Error:", error);
+        alert(`Error subiendo ${nextProduct.name}. Se reintentará luego.`);
+      } finally {
+        setActiveUpload(null);
+        setUploadProgress(0);
+        setUploadETA(null);
+      }
+    };
+
+    processQueue();
+  }, [uploadQueue, activeUpload, onUpdateProduct]);
+
   // Función de compresión de imágenes optimizada (< 400KB)
   const compressImage = (base64: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -152,26 +191,30 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     }
   };
 
-  const handleSaveProduct = async () => {
+  const handleSaveProduct = () => {
     let finalSizes: (string | number)[] = [];
     if (addType === 'shoes') finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
     else if (addType === 'sportwear') finalSizes = selectedSportwearSizes;
     else finalSizes = ['Talla Única'];
 
     if (!newProduct.name || !newProduct.brand || !newProduct.price || !newProduct.images.front) return alert("⚠️ Faltan datos críticos.");
-    
-    // UI OPTIMISTA: Cerramos y limpiamos de inmediato
+    if (finalSizes.length === 0) return alert("⚠️ Debes asignar las tallas.");
+
     const product: Product = {
       id: `spicy-${Date.now()}`, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }
     };
-    
-    // No esperamos al await para la UI
-    onAddProduct(product); 
+
+    // 1. Optimistic UI: Añadir al estado global del padre inmediatamente
+    onAddProduct(product);
+
+    // 2. Añadir a la cola de subida real
+    setUploadQueue(prev => [...prev, product]);
+
+    alert("✅ Producto en cola. Puedes seguir trabajando.");
     setActiveTab('inventory');
     setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
     setSizesText('');
     setSelectedSportwearSizes([]);
-    // El feedback visual de sincronización lo maneja el componente App
   };
 
 
@@ -472,6 +515,50 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
           )}
         </div>
       </div>
+
+      {/* PANEL DE COLA DE SUBIDAS (UI PREMIUM) */}
+      {(activeUpload || uploadQueue.length > 0) && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 z-[200] w-[90%] max-w-sm animate-fade-in">
+          <div className="bg-black/80 backdrop-blur-xl border border-red-600/50 rounded-3xl p-6 shadow-[0_20px_50px_rgba(220,38,38,0.3)] space-y-4 overflow-hidden relative">
+            {/* Reflejo de cristal */}
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-600/40 to-transparent"></div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_rgba(220,38,38,1)]"></div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-red-500">Subiendo a la Nube</span>
+              </div>
+              {uploadETA !== null && (
+                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Restan: {uploadETA}s</span>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-end">
+                <p className="text-sm font-black italic uppercase truncate max-w-[70%] text-white">{activeUpload?.name || 'Iniciando...'}</p>
+                <p className="text-xs font-black text-red-600">{Math.round(uploadProgress)}%</p>
+              </div>
+              <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5">
+                <div 
+                  className="h-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)] transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+
+            {uploadQueue.length > 0 && (
+              <div className="pt-3 border-t border-white/5">
+                <p className="text-[8px] font-black text-zinc-500 uppercase mb-2">En espera ({uploadQueue.length}):</p>
+                <div className="flex flex-wrap gap-2">
+                  {uploadQueue.map((p, i) => (
+                    <span key={i} className="text-[8px] font-bold bg-zinc-900 px-2 py-1 rounded-md text-zinc-400 border border-white/5">{p.name}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
