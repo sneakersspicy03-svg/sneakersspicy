@@ -28,16 +28,9 @@ export interface GlobalState {
   lastUpdated: number;
 }
 
-const base64ToBlob = (base64: string): Blob => {
-  const parts = base64.split(';base64,');
-  const contentType = parts[0].split(':')[1];
-  const raw = window.atob(parts[1]);
-  const rawLength = raw.length;
-  const uInt8Array = new Uint8Array(rawLength);
-  for (let i = 0; i < rawLength; ++i) {
-    uInt8Array[i] = raw.charCodeAt(i);
-  }
-  return new Blob([uInt8Array], { type: contentType });
+const base64ToBlob = async (base64: string): Promise<Blob> => {
+  const response = await fetch(base64);
+  return await response.blob();
 };
 
 export const syncService = {
@@ -50,7 +43,7 @@ export const syncService = {
     
     try {
       const storageRef = ref(storage, `products/${fileName}`);
-      const blob = base64ToBlob(base64Data);
+      const blob = await base64ToBlob(base64Data);
       const uploadTask = uploadBytesResumable(storageRef, blob);
       const startTime = Date.now();
 
@@ -82,7 +75,7 @@ export const syncService = {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     try {
       const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}`);
-      const blob = base64ToBlob(base64Data);
+      const blob = await base64ToBlob(base64Data);
       const uploadTask = uploadBytesResumable(storageRef, blob);
       await uploadTask;
       return await getDownloadURL(storageRef);
@@ -97,7 +90,6 @@ export const syncService = {
     onProgress?: (progress: number, timeRemaining: number) => void
   ): Promise<Product> => {
     try {
-      // Cálculo de peso total para progreso unificado (aproximado)
       let mainImageUrl = product.image;
       const imagesToUpload = [];
       
@@ -152,7 +144,6 @@ export const syncService = {
 
   toggleStock: async (id: string, isSoldOut: boolean): Promise<void> => {
     try {
-      // ACTUALIZACIÓN ATÓMICA: Únicamente el campo isSoldOut
       const docRef = doc(db, "productos", id);
       await updateDoc(docRef, { isSoldOut });
     } catch (error) {
