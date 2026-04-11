@@ -29,48 +29,72 @@ export interface GlobalState {
 }
 
 export const syncService = {
-  uploadImage: async (
-    base64Data: string, 
-    fileName: string, 
-    onProgress?: (progress: number, eta: number, speed: number) => void
-  ): Promise<string> => {
+  // SUBIDA INDIVIDUAL DE IMÁGENES (SÍNCRONA Y ROBUSTA)
+  uploadImage: async (base64Data: string, fileName: string): Promise<string> => {
+    // Si no es Base64, devolver tal cual (ya es una URL)
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     
     try {
       const storageRef = ref(storage, `products/${fileName}`);
-      
-      // 1. Pesar y convertir la imagen estrictamente a Blob
       const response = await fetch(base64Data);
       const blob = await response.blob();
-      
       const uploadTask = uploadBytesResumable(storageRef, blob);
-      const startTime = Date.now();
 
       return new Promise<string>((resolve, reject) => {
-        uploadTask.on('state_changed', 
-          (snapshot) => {
-            // 2. Matemática de progreso y velocidad (Senior Performance Implementation)
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            const elapsedTime = (Date.now() - startTime) / 1000; // en segundos
-            const speed = elapsedTime > 0 ? snapshot.bytesTransferred / elapsedTime : 0; // bytes por segundo
-            const remainingBytes = snapshot.totalBytes - snapshot.bytesTransferred;
-            const etaSeconds = speed > 0 ? remainingBytes / speed : 0; 
-            
-            if (onProgress) onProgress(progress, etaSeconds, speed);
-          }, 
-          (error) => {
-            console.error("Upload Task Error:", error);
-            reject(error);
-          }, 
+        uploadTask.on('state_changed', null, 
+          (error) => reject(error), 
           async () => {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(downloadURL);
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
           }
         );
       });
     } catch (error) {
-      console.error('Storage Upload Error:', error);
-      return base64Data;
+      console.error('Critical Upload Error:', error);
+      throw error;
+    }
+  },
+
+  // GUARDADO DE PRODUCTO (FLUJO SÍNCRONO BLOQUEANTE)
+  saveProduct: async (product: Product): Promise<Product> => {
+    try {
+      console.log(`🚀 Iniciando persistencia para: ${product.name}`);
+      let mainImageUrl = product.image;
+      
+      // 1. Procesar Imagen Principal
+      if (mainImageUrl.startsWith('data:image/')) {
+        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main`);
+      }
+      
+      // 2. Procesar Galería de Imágenes
+      const updatedImages: any = {};
+      if (product.images) {
+        for (const [key, val] of Object.entries(product.images)) {
+          if (typeof val === 'string' && val.startsWith('data:image/')) {
+            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}`);
+          } else {
+            updatedImages[key] = val;
+          }
+        }
+      }
+
+      // 3. Crear objeto final limpio (SIN BASE64)
+      const finalProduct = { 
+        ...product, 
+        image: mainImageUrl, 
+        images: updatedImages,
+        lastUpdated: Date.now() 
+      };
+
+      // 4. Persistir en Firestore
+      const docRef = doc(db, "productos", product.id);
+      await setDoc(docRef, finalProduct);
+      
+      console.log(`✅ Producto persistido con éxito en Firebase: ${product.id}`);
+      return finalProduct;
+    } catch (error) {
+      console.error('Firebase Save Product Error:', error);
+      throw error;
     }
   },
 
@@ -89,63 +113,6 @@ export const syncService = {
     }
   },
 
-  saveProduct: async (
-    product: Product, 
-    onProgress?: (progress: number, eta: number, speed: number) => void
-  ): Promise<Product> => {
-    try {
-      let mainImageUrl = product.image;
-      const imagesToUpload = [];
-      
-      if (mainImageUrl.startsWith('data:image/')) {
-        imagesToUpload.push({ key: 'main', val: mainImageUrl });
-      }
-      
-      if (product.images) {
-        for (const [key, val] of Object.entries(product.images)) {
-          if (typeof val === 'string' && val.startsWith('data:image/')) {
-            imagesToUpload.push({ key, val });
-          }
-        }
-      }
-
-      let completedUploads = 0;
-      const totalUploads = imagesToUpload.length || 1;
-
-      const handleInternalProgress = (p: number, eta: number, speed: number) => {
-        if (onProgress) {
-          const overallProgress = ((completedUploads + (p / 100)) / totalUploads) * 100;
-          onProgress(overallProgress, eta, speed);
-        }
-      };
-
-      if (mainImageUrl.startsWith('data:image/')) {
-        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main`, handleInternalProgress);
-        completedUploads++;
-      }
-      
-      const updatedImages: any = {};
-      if (product.images) {
-        for (const [key, val] of Object.entries(product.images)) {
-          if (typeof val === 'string' && val.startsWith('data:image/')) {
-            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}`, handleInternalProgress);
-            completedUploads++;
-          } else {
-            updatedImages[key] = val;
-          }
-        }
-      }
-
-      const finalProduct = { ...product, image: mainImageUrl, images: updatedImages };
-      const docRef = doc(db, "productos", product.id);
-      await setDoc(docRef, finalProduct);
-      return finalProduct;
-    } catch (error) {
-      console.error('Save Product Error:', error);
-      throw error;
-    }
-  },
-
   toggleStock: async (id: string, isSoldOut: boolean): Promise<void> => {
     try {
       const docRef = doc(db, "productos", id);
@@ -161,6 +128,7 @@ export const syncService = {
       await deleteDoc(doc(db, "productos", id));
     } catch (error) {
       console.error('Delete Product Error:', error);
+      throw error;
     }
   },
 
