@@ -40,7 +40,7 @@ const App: React.FC = () => {
 
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>('¡Hola! Quiero confirmar el siguiente pedido:\n\n[DETALLES]\n\n• TOTAL FINAL: [TOTAL]\n\n¿Tienen disponibilidad para entrega hoy?');
-  const [currentProducts, setCurrentProducts] = useState<Product[]>(PRODUCTS);
+  const [currentProducts, setCurrentProducts] = useState<Product[]>([]);
   const [currentCategories, setCurrentCategories] = useState<SportwearCategory[]>(SPORTWEAR_CATEGORIES);
   const [tennisBrands, setTennisBrands] = useState<BrandStock[]>(TENNIS_BRANDS);
   const [socksBrands, setSocksBrands] = useState<BrandStock[]>(SOCKS_BRANDS);
@@ -59,8 +59,6 @@ const App: React.FC = () => {
           if (cloudState.whatsappTemplate) setWhatsappTemplate(cloudState.whatsappTemplate);
           if (cloudState.tennisBrands && cloudState.tennisBrands.length > 0) setActiveBrand(cloudState.tennisBrands[0]);
           setCloudOffline(false);
-        } else {
-          throw new Error('Cloud offline');
         }
       } catch (e) {
         setCloudOffline(true);
@@ -85,19 +83,24 @@ const App: React.FC = () => {
 
   const publishState = useCallback(async (updates: Partial<GlobalState>) => {
     setIsPublishing(true);
-    const newState: GlobalState = {
-      products: updates.products ?? currentProducts,
-      categories: updates.categories ?? currentCategories,
-      tennisBrands: updates.tennisBrands ?? tennisBrands,
-      socksBrands: updates.socksBrands ?? socksBrands,
-      logo: updates.logo ?? customLogo,
-      whatsappTemplate: updates.whatsappTemplate ?? whatsappTemplate,
-      lastUpdated: Date.now()
-    };
-    localStorage.setItem('spicy_inventory', JSON.stringify(newState));
-    const success = await syncService.pushState(newState);
-    setCloudOffline(!success);
-    setIsPublishing(false);
+    try {
+      const newState: GlobalState = {
+        products: updates.products ?? currentProducts,
+        categories: updates.categories ?? currentCategories,
+        tennisBrands: updates.tennisBrands ?? tennisBrands,
+        socksBrands: updates.socksBrands ?? socksBrands,
+        logo: updates.logo ?? customLogo,
+        whatsappTemplate: updates.whatsappTemplate ?? whatsappTemplate,
+        lastUpdated: Date.now()
+      };
+      localStorage.setItem('spicy_inventory', JSON.stringify(newState));
+      const success = await syncService.pushState(newState);
+      setCloudOffline(!success);
+    } catch (e) {
+      console.error("Error publishing state:", e);
+    } finally {
+      setIsPublishing(false);
+    }
   }, [currentProducts, currentCategories, tennisBrands, socksBrands, customLogo, whatsappTemplate]);
 
   const filteredProducts = useMemo(() => {
@@ -114,21 +117,14 @@ const App: React.FC = () => {
     document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleQuickAdd = (brand: string, type: 'shoes' | 'sportwear' | 'socks') => {
-    setInitialDevBrand(brand);
-    setInitialDevType(type);
-    setIsDevPanelOpen(true);
-  };
-
   const handleAddToCart = (p: Product, s: number | string) => {
     setCartItems(prev => {
       const exIndex = prev.findIndex(i => i.id === p.id && String(i.selectedSize) === String(s));
-      if (exIndex > -1) {
-        const newItems = [...prev];
-        newItems[exIndex] = { ...newItems[exIndex], quantity: newItems[exIndex].quantity + 1 };
-        return newItems;
-      }
-      return [...prev, { ...p, quantity: 1, selectedSize: s }];
+      const newItems = exIndex > -1 
+        ? prev.map((item, idx) => idx === exIndex ? { ...item, quantity: item.quantity + 1 } : item)
+        : [...prev, { ...p, quantity: 1, selectedSize: s }];
+      localStorage.setItem('spicy_cart', JSON.stringify(newItems));
+      return newItems;
     });
     setTimeout(() => setIsCartOpen(true), 50);
   };
@@ -154,9 +150,9 @@ const App: React.FC = () => {
       />
 
       <main className="pb-20">
-        <Hero brands={tennisBrands} products={currentProducts} onBrandSelect={setActiveBrand} activeBrand={activeBrand} isDevMode={isDevMode} onSelectSize={handleSelectSize} onQuickAdd={(b) => handleQuickAdd(b, 'shoes')} />
-        <Sportwear categories={currentCategories} products={currentProducts} onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => handleQuickAdd(b, 'sportwear')} />
-        <Socks brands={socksBrands} products={currentProducts} onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => handleQuickAdd(b, 'socks')} />
+        <Hero brands={tennisBrands} products={currentProducts} onBrandSelect={setActiveBrand} activeBrand={activeBrand} isDevMode={isDevMode} onSelectSize={handleSelectSize} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('shoes'); setIsDevPanelOpen(true); }} />
+        <Sportwear categories={currentCategories} products={currentProducts} onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} />
+        <Socks brands={socksBrands} products={currentProducts} onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} />
         
         <section id="product-grid" className="px-6 md:px-20 py-24 scroll-mt-24">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
@@ -182,36 +178,30 @@ const App: React.FC = () => {
         isAuthorized={isAdminAuthorized} initialBrand={initialDevBrand} initialType={initialDevType}
         onLoginSuccess={() => { setIsAdminAuthorized(true); setIsDevMode(true); }}
         onAddProduct={async np => { 
-          // ACTUALIZACIÓN PURAMENTE OPTIMISTA: El componente DeveloperMode manejará la cola real
-          setCurrentProducts(prev => [np, ...prev]);
+          const updated = [np, ...currentProducts];
+          setCurrentProducts(updated);
+          await publishState({ products: updated });
         }}
         onDeleteProduct={async id => { 
-          try {
-            setIsPublishing(true);
-            await syncService.deleteProduct(id);
-            const updated = currentProducts.filter(p => p.id !== id); 
-            setCurrentProducts(updated); 
-            await publishState({ products: updated }); 
-          } finally {
-            setIsPublishing(false);
+          if(confirm('¿Seguro?')) {
+            try {
+              await syncService.deleteProduct(id);
+              const updated = currentProducts.filter(p => p.id !== id);
+              setCurrentProducts(updated);
+              await publishState({ products: updated });
+            } catch (e) { alert("Error al borrar."); }
           }
         }}
         onToggleStock={async (id) => { 
-          // ACTUALIZACIÓN ATÓMICA Y OPTIMISTA INMEDIATA
           const product = currentProducts.find(p => p.id === id);
           if (product) {
-            const newSoldOutStatus = !product.isSoldOut;
-            const updatedProducts = currentProducts.map(p => p.id === id ? { ...p, isSoldOut: newSoldOutStatus } : p);
-            setCurrentProducts(updatedProducts);
-            
-            // Sincronización en segundo plano sin bloquear el hilo principal
-            syncService.toggleStock(id, newSoldOutStatus)
-              .then(() => publishState({ products: updatedProducts }))
-              .catch(e => {
-                console.error("❌ Fallo en sincronización atómica:", e);
-                // Revertir solo si falla críticamente
-                setCurrentProducts(currentProducts);
-              });
+            const newStatus = !product.isSoldOut;
+            const updated = currentProducts.map(p => p.id === id ? { ...p, isSoldOut: newStatus } : p);
+            setCurrentProducts(updated);
+            try {
+              await syncService.toggleStock(id, newStatus);
+              await publishState({ products: updated });
+            } catch (e) { setCurrentProducts(currentProducts); }
           }
         }}
         onAddTennisBrand={nb => { const updated = [...tennisBrands, nb]; setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
@@ -227,50 +217,37 @@ const App: React.FC = () => {
         onReorderSocks={(s, t) => { const list = [...socksBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setSocksBrands(list); publishState({ socksBrands: list }); }}
         onReorderCategory={(s, t) => { const list = [...currentCategories]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setCurrentCategories(list); publishState({ categories: list }); }}
         onUpdateProduct={async (p) => { 
-          try {
-            setIsPublishing(true);
-            const savedProduct = await syncService.saveProduct(p);
-            const updated = currentProducts.map(cp => cp.id === p.id ? savedProduct : cp); 
-            setCurrentProducts(updated); 
-            await publishState({ products: updated }); 
-          } finally {
-            setIsPublishing(false);
-          }
+          const updated = currentProducts.map(cp => cp.id === p.id ? p : cp); 
+          setCurrentProducts(updated); 
+          await publishState({ products: updated }); 
         }}
         onLogout={() => { setIsAdminAuthorized(false); setIsDevMode(false); }}
         onLoadTestData={async () => {
-          setIsLoading(true);
-          try {
-            const cloudState = await syncService.fetchState();
-            if (cloudState) {
-              setCurrentProducts(cloudState.products);
-              setTennisBrands(cloudState.tennisBrands);
-              setSocksBrands(cloudState.socksBrands);
-              setCurrentCategories(cloudState.categories);
-              setCustomLogo(cloudState.logo);
-              if (cloudState.whatsappTemplate) setWhatsappTemplate(cloudState.whatsappTemplate);
-              alert("🔥 Sincronización Cloud exitosa.");
-            }
-          } catch (e) { alert("❌ Error sincronizando."); } finally { setIsLoading(false); }
+          const cloudState = await syncService.fetchState();
+          if (cloudState) {
+            setCurrentProducts(cloudState.products);
+            setTennisBrands(cloudState.tennisBrands);
+            setSocksBrands(cloudState.socksBrands);
+            setCurrentCategories(cloudState.categories);
+            setCustomLogo(cloudState.logo);
+            alert("Sincronización exitosa.");
+          }
         }}
         onClearInventory={async () => {
-          if(confirm("⚠️ ¿Vaciado total?")) {
-            try {
-              setIsPublishing(true);
-              for (const p of currentProducts) await syncService.deleteProduct(p.id);
-              setCurrentProducts([]);
-              await publishState({ products: [] });
-            } finally { setIsPublishing(false); }
+          if(confirm("¿Vaciado total?")) {
+            for (const p of currentProducts) await syncService.deleteProduct(p.id);
+            setCurrentProducts([]);
+            await publishState({ products: [] });
           }
         }}
         onClearBanners={async () => {
-          if(confirm("⚠️ ¿Borrar banners?")) {
+          if(confirm("¿Borrar banners?")) {
             setTennisBrands([]); setSocksBrands([]); setCurrentCategories([]);
-            await publishState({ tennisBrands: [], socksBrands: [], categories: [], logo: customLogo });
+            await publishState({ tennisBrands: [], socksBrands: [], categories: [] });
           }
         }}
-        />
-        </div>
+      />
+    </div>
   );
 };
 
