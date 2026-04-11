@@ -28,40 +28,31 @@ export interface GlobalState {
   lastUpdated: number;
 }
 
-const base64ToBlob = async (base64: string): Promise<Blob> => {
-  const response = await fetch(base64);
-  return await response.blob();
-};
-
 export const syncService = {
   uploadImage: async (
     base64Data: string, 
     fileName: string, 
-    onProgress?: (progress: number, timeRemaining: number) => void
+    onProgress?: (progress: number) => void
   ): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     
     try {
       const storageRef = ref(storage, `products/${fileName}`);
-      const blob = await base64ToBlob(base64Data);
+      
+      const response = await fetch(base64Data);
+      const blob = await response.blob();
       const uploadTask = uploadBytesResumable(storageRef, blob);
-      const startTime = Date.now();
 
-      return new Promise((resolve, reject) => {
+      return new Promise<string>((resolve, reject) => {
         uploadTask.on('state_changed', 
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            const elapsed = (Date.now() - startTime) / 1000;
-            const speed = snapshot.bytesTransferred / elapsed; // bytes/sec
-            const remainingBytes = snapshot.totalBytes - snapshot.bytesTransferred;
-            const timeRemaining = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
-            
-            if (onProgress) onProgress(progress, timeRemaining);
+            if (onProgress) onProgress(progress);
           }, 
           (error) => reject(error), 
           async () => {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(downloadURL);
+            const url = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(url);
           }
         );
       });
@@ -75,7 +66,8 @@ export const syncService = {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     try {
       const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}`);
-      const blob = await base64ToBlob(base64Data);
+      const response = await fetch(base64Data);
+      const blob = await response.blob();
       const uploadTask = uploadBytesResumable(storageRef, blob);
       await uploadTask;
       return await getDownloadURL(storageRef);
@@ -87,7 +79,7 @@ export const syncService = {
 
   saveProduct: async (
     product: Product, 
-    onProgress?: (progress: number, timeRemaining: number) => void
+    onProgress?: (progress: number) => void
   ): Promise<Product> => {
     try {
       let mainImageUrl = product.image;
@@ -106,12 +98,12 @@ export const syncService = {
       }
 
       let completedUploads = 0;
-      const totalUploads = imagesToUpload.length;
+      const totalUploads = imagesToUpload.length || 1;
 
-      const handleInternalProgress = (p: number, tr: number) => {
+      const handleInternalProgress = (p: number) => {
         if (onProgress) {
           const overallProgress = ((completedUploads + (p / 100)) / totalUploads) * 100;
-          onProgress(overallProgress, tr);
+          onProgress(overallProgress);
         }
       };
 

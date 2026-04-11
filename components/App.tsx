@@ -197,24 +197,21 @@ const App: React.FC = () => {
           }
         }}
         onToggleStock={async (id) => { 
-          // ACTUALIZACIÓN ATÓMICA Y OPTIMISTA
+          // ACTUALIZACIÓN ATÓMICA Y OPTIMISTA INMEDIATA
           const product = currentProducts.find(p => p.id === id);
           if (product) {
             const newSoldOutStatus = !product.isSoldOut;
             const updatedProducts = currentProducts.map(p => p.id === id ? { ...p, isSoldOut: newSoldOutStatus } : p);
             setCurrentProducts(updatedProducts);
             
-            try {
-              setIsPublishing(true);
-              await syncService.toggleStock(id, newSoldOutStatus);
-              await publishState({ products: updatedProducts }); 
-            } catch (e) {
-              // Revertir en caso de fallo atómico
-              setCurrentProducts(currentProducts);
-              alert("❌ Fallo en sincronización atómica.");
-            } finally {
-              setIsPublishing(false);
-            }
+            // Sincronización en segundo plano sin bloquear el hilo principal
+            syncService.toggleStock(id, newSoldOutStatus)
+              .then(() => publishState({ products: updatedProducts }))
+              .catch(e => {
+                console.error("❌ Fallo en sincronización atómica:", e);
+                // Revertir solo si falla críticamente
+                setCurrentProducts(currentProducts);
+              });
           }
         }}
         onAddTennisBrand={nb => { const updated = [...tennisBrands, nb]; setTennisBrands(updated); publishState({ tennisBrands: updated }); }}

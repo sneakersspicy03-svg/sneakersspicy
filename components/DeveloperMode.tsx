@@ -92,17 +92,19 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       setUploadETA(null);
 
       try {
-        const savedProduct = await syncService.saveProduct(nextProduct, (progress, eta) => {
+        const savedProduct = await syncService.saveProduct(nextProduct, (progress) => {
           setUploadProgress(progress);
-          setUploadETA(eta);
+        }).catch(error => {
+          console.error("❌ Queue Upload Error (Internal):", error);
+          setActiveUpload(null);
+          setUploadProgress(0);
+          throw error; // Re-lanzar para el bloque try/catch externo
         });
         
-        // Actualizar el producto en el padre con la versión que tiene URLs de Storage
         await onUpdateProduct(savedProduct);
         console.log(`✅ Upload complete: ${savedProduct.name}`);
       } catch (error) {
         console.error("❌ Queue Upload Error:", error);
-        alert(`Error subiendo ${nextProduct.name}. Se reintentará luego.`);
       } finally {
         setActiveUpload(null);
         setUploadProgress(0);
