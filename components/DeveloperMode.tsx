@@ -44,7 +44,6 @@ interface DeveloperModeProps {
 }
 
 type AddType = 'shoes' | 'sportwear' | 'socks';
-const CLOTHING_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
 const DeveloperMode: React.FC<DeveloperModeProps> = ({ 
   logo, onUpdateLogo, whatsappTemplate, onUpdateWhatsAppTemplate, isOpen, onClose, products, categories, tennisBrands, socksBrands, isAuthorized, initialBrand, initialType, onLoginSuccess, onLogout, onAddProduct, onUpdateProduct, onDeleteProduct, onToggleStock, 
@@ -54,7 +53,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   onAddCategory, onDeleteCategory, onUpdateCategory,
   onReorderTennis, onReorderSocks, onReorderCategory
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'add' | 'banners' | 'config'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'add' | 'banners' | 'config' | 'queue'>('inventory');
   const [addType, setAddType] = useState<AddType>('shoes');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,8 +62,6 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   
   const [showAddBannerForm, setShowAddBannerForm] = useState<{section: string | null}>({section: null});
   const [newBannerData, setNewBannerData] = useState({ name: '', title: '', subtitle: '', image: '', brand: '' });
-
-  // Estados para Edición de Banners
   const [editingBanner, setEditingBanner] = useState<{type: 'tennis' | 'socks' | 'sportwear', data: any} | null>(null);
 
   const [newProduct, setNewProduct] = useState({
@@ -74,13 +71,13 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
-  // Estados de Cola de Subida
+  // ESTADOS DE COLA DE SUBIDA AVANZADOS
   const [uploadQueue, setUploadQueue] = useState<Product[]>([]);
   const [activeUpload, setActiveUpload] = useState<Product | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadETA, setUploadETA] = useState<number | null>(null);
 
-  // Efecto de Procesamiento de Cola
+  // DESPACHADOR DE COLA SECUENCIAL (ARQUITECTURA DE FONDO)
   useEffect(() => {
     const processQueue = async () => {
       if (activeUpload || uploadQueue.length === 0) return;
@@ -92,19 +89,15 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       setUploadETA(null);
 
       try {
-        const savedProduct = await syncService.saveProduct(nextProduct, (progress) => {
+        const savedProduct = await syncService.saveProduct(nextProduct, (progress, eta) => {
           setUploadProgress(progress);
-        }).catch(error => {
-          console.error("❌ Queue Upload Error (Internal):", error);
-          setActiveUpload(null);
-          setUploadProgress(0);
-          throw error; // Re-lanzar para el bloque try/catch externo
+          setUploadETA(eta);
         });
         
         await onUpdateProduct(savedProduct);
-        console.log(`✅ Upload complete: ${savedProduct.name}`);
+        console.log(`✅ [COLA] Completado: ${savedProduct.name}`);
       } catch (error) {
-        console.error("❌ Queue Upload Error:", error);
+        console.error("❌ [COLA] Fallo Crítico:", error);
       } finally {
         setActiveUpload(null);
         setUploadProgress(0);
@@ -115,7 +108,6 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     processQueue();
   }, [uploadQueue, activeUpload, onUpdateProduct]);
 
-  // Función de compresión de imágenes optimizada (< 400KB)
   const compressImage = (base64: string): Promise<string> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -125,26 +117,13 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         const MAX_WIDTH = 1200;
         let width = img.width;
         let height = img.height;
-
-        if (width > MAX_WIDTH) {
-          height = (MAX_WIDTH / width) * height;
-          width = MAX_WIDTH;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
+        if (width > MAX_WIDTH) { height = (MAX_WIDTH / width) * height; width = MAX_WIDTH; }
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        
         let quality = 0.7;
         let result = canvas.toDataURL('image/jpeg', quality);
-        
-        // Ajuste iterativo para asegurar < 400KB
-        while (result.length * 0.75 > 400 * 1024 && quality > 0.1) {
-          quality -= 0.05;
-          result = canvas.toDataURL('image/jpeg', quality);
-        }
-        
+        while (result.length * 0.75 > 400 * 1024 && quality > 0.1) { quality -= 0.05; result = canvas.toDataURL('image/jpeg', quality); }
         resolve(result);
       };
     });
@@ -162,10 +141,6 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const handleLogin = () => {
     if (email.trim().toLowerCase() === 'admin@spicy.com' && password.trim() === 'spicy2025') onLoginSuccess();
     else alert('⚠️ Error: Credenciales incorrectas.');
-  };
-
-  const handleToggleSportwearSize = (size: string) => {
-    setSelectedSportwearSizes(prev => prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, key: keyof ProductImages) => {
@@ -206,124 +181,56 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       id: `spicy-${Date.now()}`, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }
     };
 
-    // 1. Optimistic UI: Añadir al estado global del padre inmediatamente
     onAddProduct(product);
-
-    // 2. Añadir a la cola de subida real
     setUploadQueue(prev => [...prev, product]);
-
-    alert("✅ Producto en cola. Puedes seguir trabajando.");
-    setActiveTab('inventory');
+    alert("🚀 ¡A la cola! El producto se subirá en segundo plano.");
     setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
     setSizesText('');
     setSelectedSportwearSizes([]);
+    setActiveTab('queue');
   };
-
 
   const handleSaveNewBanner = async () => {
     if (!newBannerData.name || !newBannerData.image) return alert("⚠️ Nombre e imagen obligatorios.");
     setIsSaving(true);
-    
-    // Compresión y Optimistic UI
     const compressedImage = await compressImage(newBannerData.image);
-    
     let sizes: (string | number)[] = [];
     if (showAddBannerForm.section === 'Calzado') sizes = [7, 8, 9, 10, 11, 12];
     else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
     else sizes = ['Talla Única'];
-
     const common = { name: newBannerData.name, marqueeImage: compressedImage, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
-    
-    // Inyectar localmente para respuesta instantánea
     if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: newBannerData.name[0] });
     else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: newBannerData.name[0] });
     else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: compressedImage });
-    
     setShowAddBannerForm({section: null}); 
     setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
-
-    try {
-      // Subida real a Firebase en segundo plano
-      await syncService.uploadBannerImage(compressedImage, newBannerData.name);
-      console.log("✅ Backup en Firebase finalizado.");
-    } catch (e) {
-      console.error("Error subiendo backup:", e);
-    } finally {
-      setIsSaving(false);
-    }
+    try { await syncService.uploadBannerImage(compressedImage, newBannerData.name); } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const handleSaveEditBanner = async () => {
     if (!editingBanner) return;
     setIsSaving(true);
-    
     const compressed = await compressImage(editingBanner.data.marqueeImage || editingBanner.data.image);
     const updatedData = { ...editingBanner.data, marqueeImage: compressed, image: compressed };
-
-    // Optimistic UI
     if (editingBanner.type === 'tennis') onUpdateTennisBrand(updatedData);
     else if (editingBanner.type === 'socks') onUpdateSocksBrand(updatedData);
     else if (editingBanner.type === 'sportwear') onUpdateCategory(updatedData);
-
     setEditingBanner(null);
-
-    try {
-      await syncService.uploadBannerImage(compressed, updatedData.name);
-      alert("✅ Banner actualizado.");
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSaving(false);
-    }
+    try { await syncService.uploadBannerImage(compressed, updatedData.name); alert("✅ Banner actualizado."); } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
   const migrateHistoricalData = async () => {
     setIsMigrating(true);
     try {
       const oldData = await import('../old_constants_migrate');
-      
-      // 1. Migrar Banners de Tenis (Calzado)
-      if (oldData.TENNIS_BRANDS) {
-        for (const b of oldData.TENNIS_BRANDS) {
-          const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_tennis_${b.name}`);
-          onAddTennisBrand({ ...b, marqueeImage: url, availableSizes: b.availableSizes || [] });
-        }
-      }
-      
-      // 2. Migrar Banners de Medias
-      if (oldData.SOCKS_BRANDS) {
-        for (const b of oldData.SOCKS_BRANDS) {
-          const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_socks_${b.name}`);
-          onAddSocksBrand({ ...b, marqueeImage: url, availableSizes: b.availableSizes || [] });
-        }
-      }
-      
-      // 3. Migrar Categorías Sportwear
-      if (oldData.SPORTWEAR_CATEGORIES) {
-        for (const c of oldData.SPORTWEAR_CATEGORIES) {
-          const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`);
-          onAddCategory({ ...c, image: url });
-        }
-      }
-
-      // 4. Migrar Productos
-      if (oldData.PRODUCTS) {
-        for (const p of oldData.PRODUCTS) {
-          await syncService.saveProduct(p);
-        }
-      }
-      
-      alert("✅ Migración Completa: Calzado, Sportwear, Medias y Productos inyectados.");
-      if (onLoadTestData) await onLoadTestData();
-    } catch (e) {
-      console.error(e);
-      alert("❌ Error en la migración.");
-    } finally {
-      setIsMigrating(false);
-    }
+      if (oldData.TENNIS_BRANDS) for (const b of oldData.TENNIS_BRANDS) { const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_tennis_${b.name}`); onAddTennisBrand({ ...b, marqueeImage: url }); }
+      if (oldData.SOCKS_BRANDS) for (const b of oldData.SOCKS_BRANDS) { const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_socks_${b.name}`); onAddSocksBrand({ ...b, marqueeImage: url }); }
+      if (oldData.SPORTWEAR_CATEGORIES) for (const c of oldData.SPORTWEAR_CATEGORIES) { const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`); onAddCategory({ ...c, image: url }); }
+      if (oldData.PRODUCTS) for (const p of oldData.PRODUCTS) { await syncService.saveProduct(p); }
+      alert("✅ Migración Completa."); if (onLoadTestData) await onLoadTestData();
+    } catch (e) { alert("❌ Error en la migración."); } finally { setIsMigrating(false); }
   };
 
-  const shoesInv = products.filter(p => p.category === 'Shoes');
   if (!isOpen) return null;
 
   return (
@@ -335,11 +242,12 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
           <div className="flex items-center space-x-6">
             <h3 className="text-red-600 font-black italic text-xl md:text-2xl tracking-tighter">ADMIN_SPICY</h3>
             {isAuthorized && (
-              <div className="flex bg-black p-1 rounded-xl border border-white/5">
-                <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>📦 Stock</button>
-                <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'add' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>➕ Nuevo</button>
-                <button onClick={() => setActiveTab('banners')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>🖼️ Banners</button>
-                <button onClick={() => setActiveTab('config')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'config' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>⚙️ Ajustes</button>
+              <div className="flex bg-black p-1 rounded-xl border border-white/5 overflow-x-auto no-scrollbar">
+                <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>📦 Stock</button>
+                <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'add' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>➕ Nuevo</button>
+                <button onClick={() => setActiveTab('queue')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'queue' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>🚀 Cola {uploadQueue.length > 0 ? `(${uploadQueue.length})` : ''}</button>
+                <button onClick={() => setActiveTab('banners')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>🖼️ Banners</button>
+                <button onClick={() => setActiveTab('config')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>⚙️ Ajustes</button>
               </div>
             )}
           </div>
@@ -355,6 +263,77 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <input type="password" placeholder="CONTRASEÑA" className="w-full bg-zinc-900 border border-white/10 p-5 rounded-2xl text-xs font-bold text-white" onChange={e => setPassword(e.target.value)} value={password} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                </div>
                <button onClick={handleLogin} className="w-full bg-red-600 py-5 rounded-2xl font-black text-xs uppercase tracking-widest mt-6">ENTRAR</button>
+            </div>
+          ) : activeTab === 'queue' ? (
+            <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-8">
+                <div>
+                  <h4 className="text-4xl font-black italic uppercase tracking-tighter">Terminal de Subida</h4>
+                  <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest mt-2">Gestión de activos en segundo plano</p>
+                </div>
+                <div className="bg-zinc-900 px-6 py-4 rounded-2xl border border-white/5">
+                  <span className="text-zinc-500 text-[9px] font-black uppercase block">ETA GLOBAL ESTIMADO</span>
+                  <span className="text-red-500 text-xl font-black italic">{activeUpload ? `${(uploadETA || 0) + (uploadQueue.length * 15)}s` : '0s'}</span>
+                </div>
+              </div>
+
+              {activeUpload ? (
+                <div className="bg-zinc-900/50 p-10 rounded-[3rem] border border-red-600/20 relative overflow-hidden shadow-2xl">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-600 to-transparent animate-pulse"></div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div className="space-y-6">
+                      <div className="flex items-center space-x-4">
+                        <div className="w-3 h-3 bg-red-600 rounded-full animate-ping"></div>
+                        <span className="text-red-600 font-black uppercase text-xs tracking-widest">Transmitiendo...</span>
+                      </div>
+                      <h5 className="text-5xl font-black italic uppercase text-white leading-none">{activeUpload.name}</h5>
+                      <div className="flex items-center space-x-6">
+                        <div>
+                          <p className="text-zinc-500 text-[9px] font-black uppercase">PROGRESO REAL</p>
+                          <p className="text-2xl font-black italic">{Math.round(uploadProgress)}%</p>
+                        </div>
+                        <div className="w-px h-10 bg-white/10"></div>
+                        <div>
+                          <p className="text-zinc-500 text-[9px] font-black uppercase">TIEMPO RESTANTE</p>
+                          <p className="text-2xl font-black italic text-red-500">{uploadETA || '--'}s</p>
+                        </div>
+                      </div>
+                      <div className="w-full h-4 bg-black rounded-full overflow-hidden border border-white/5 p-1">
+                        <div className="h-full bg-red-600 rounded-full transition-all duration-500 ease-out shadow-[0_0_20px_rgba(220,38,38,0.5)]" style={{ width: `${uploadProgress}%` }}></div>
+                      </div>
+                    </div>
+                    <div className="relative group">
+                      <div className="aspect-square bg-black rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl">
+                        <img src={activeUpload.image} className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <svg className="w-20 h-20 text-red-600 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+                  <p className="text-zinc-600 font-black italic text-2xl uppercase">Canal de subida inactivo</p>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                <h6 className="text-xl font-black italic uppercase border-l-4 border-red-600 pl-4">Lista de Espera ({uploadQueue.length})</h6>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {uploadQueue.map((p, idx) => (
+                    <div key={idx} className="bg-zinc-900/30 p-5 rounded-2xl border border-white/5 flex items-center space-x-4 opacity-50">
+                      <div className="w-12 h-12 bg-black rounded-xl overflow-hidden grayscale">
+                        <img src={p.image} className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-white truncate max-w-[150px]">{p.name}</p>
+                        <p className="text-[8px] font-bold text-zinc-600 uppercase">PENDIENTE</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : activeTab === 'add' ? (
             <div className="max-w-6xl mx-auto space-y-12 pb-20 animate-fade-in">
@@ -375,8 +354,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <textarea placeholder="Reseña Técnica" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold h-32" />
                   <input placeholder="Tallas (EJ: 7, 8.5, 10)" value={sizesText} onChange={e => setSizesText(e.target.value)} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
                   <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
-                  <button onClick={handleSaveProduct} disabled={isSaving} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl disabled:opacity-50">
-                    {isSaving ? "Guardando..." : "Publicar"}
+                  <button onClick={handleSaveProduct} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl">
+                    Añadir a la Cola de Subida
                   </button>
                 </div>
                 <div className="space-y-6">
@@ -394,8 +373,6 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
           ) : activeTab === 'banners' ? (
             <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">
               <h4 className="text-3xl font-black italic uppercase text-white border-l-4 border-red-600 pl-6 tracking-tighter">Diseño & Banners</h4>
-              
-              {/* Formulario de Edición Modal-like */}
               {editingBanner && (
                 <div className="bg-zinc-900 p-8 rounded-[2rem] border border-red-600/50 space-y-6 animate-scale-in shadow-2xl">
                   <h5 className="text-lg font-black uppercase text-red-600 italic">Editar Banner: {editingBanner.data.name}</h5>
@@ -413,7 +390,6 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   </div>
                 </div>
               )}
-
               {['Calzado', 'Sportwear', 'Medias'].map((section) => {
                 const list = section === 'Calzado' ? tennisBrands : section === 'Medias' ? socksBrands : categories;
                 return (
@@ -422,41 +398,12 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                       <h5 className="text-xl font-black uppercase text-red-600 italic tracking-widest">{section}</h5>
                       <button onClick={() => setShowAddBannerForm({section})} className="px-6 py-3 bg-white text-black text-[10px] font-black uppercase rounded-2xl shadow-lg">+ Añadir</button>
                     </div>
-                    {showAddBannerForm.section === section && (
-                      <div className="bg-black p-8 rounded-[2rem] border border-red-600/30 animate-scale-in space-y-6 shadow-2xl">
-                         <div className="grid grid-cols-2 gap-4">
-                            <input value={newBannerData.name} onChange={e => setNewBannerData({...newBannerData, name: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold" placeholder="Nombre (Nike...)" />
-                            <input value={newBannerData.title} onChange={e => setNewBannerData({...newBannerData, title: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco" />
-                            <input value={newBannerData.subtitle} onChange={e => setNewBannerData({...newBannerData, subtitle: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris" />
-                            <div className="relative aspect-video bg-zinc-900 rounded-xl overflow-hidden border border-white/5">
-                               {newBannerData.image ? <img src={newBannerData.image} className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-zinc-600 absolute inset-0 flex items-center justify-center">SUBIR IMAGEN</span>}
-                               <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload = (ev) => setNewBannerData({...newBannerData, image: ev.target?.result as string}); r.readAsDataURL(f); }}} />
-                            </div>
-                         </div>
-                         <div className="flex space-x-3">
-                            <button onClick={handleSaveNewBanner} disabled={isSaving} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-red-700">Guardar Banner</button>
-                            <button onClick={() => setShowAddBannerForm({section: null})} className="px-6 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
-                         </div>
-                      </div>
-                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {list.map((item: any, idx) => (
                         <div key={idx} className="bg-black/60 p-5 rounded-3xl border border-white/5 group relative hover:border-red-600/40 transition-all">
                           <div className="absolute top-4 right-4 flex space-x-2 z-20">
                             <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                            <button 
-                              onClick={(e) => { 
-                                e.stopPropagation();
-                                if(confirm('¿Borrar permanentemente?')) { 
-                                  if(section === 'Calzado') onDeleteTennisBrand(item.name); 
-                                  else if(section === 'Medias') onDeleteSocksBrand(item.name); 
-                                  else onDeleteCategory(item.name); 
-                                } 
-                              }} 
-                              className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xl"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg>
-                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Borrar permanentemente?')) { if(section === 'Calzado') onDeleteTennisBrand(item.name); else if(section === 'Medias') onDeleteSocksBrand(item.name); else onDeleteCategory(item.name); } }} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                           </div>
                           <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4 relative">
                             <img src={item.marqueeImage || item.image} className="w-full h-full object-cover transition-all duration-500" />
@@ -518,36 +465,26 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         </div>
       </div>
 
-      {/* PANEL DE COLA DE SUBIDAS (UI PREMIUM) */}
       {(activeUpload || uploadQueue.length > 0) && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 z-[200] w-[90%] max-w-sm animate-fade-in">
           <div className="bg-black/80 backdrop-blur-xl border border-red-600/50 rounded-3xl p-6 shadow-[0_20px_50px_rgba(220,38,38,0.3)] space-y-4 overflow-hidden relative">
-            {/* Reflejo de cristal */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-600/40 to-transparent"></div>
-            
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 bg-red-600 rounded-full animate-pulse shadow-[0_0_10px_rgba(220,38,38,1)]"></div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-red-500">Subiendo a la Nube</span>
               </div>
-              {uploadETA !== null && (
-                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Restan: {uploadETA}s</span>
-              )}
+              {uploadETA !== null && <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Restan: {uploadETA}s</span>}
             </div>
-
             <div className="space-y-2">
               <div className="flex justify-between items-end">
                 <p className="text-sm font-black italic uppercase truncate max-w-[70%] text-white">{activeUpload?.name || 'Iniciando...'}</p>
                 <p className="text-xs font-black text-red-600">{Math.round(uploadProgress)}%</p>
               </div>
               <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5">
-                <div 
-                  className="h-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)] transition-all duration-300 ease-out"
-                  style={{ width: `${uploadProgress}%` }}
-                ></div>
+                <div className="h-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)] transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div>
               </div>
             </div>
-
             {uploadQueue.length > 0 && (
               <div className="pt-3 border-t border-white/5">
                 <p className="text-[8px] font-black text-zinc-500 uppercase mb-2">En espera ({uploadQueue.length}):</p>

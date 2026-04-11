@@ -32,7 +32,7 @@ export const syncService = {
   uploadImage: async (
     base64Data: string, 
     fileName: string, 
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, eta: number) => void
   ): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     
@@ -42,12 +42,18 @@ export const syncService = {
       const response = await fetch(base64Data);
       const blob = await response.blob();
       const uploadTask = uploadBytesResumable(storageRef, blob);
+      const startTime = Date.now();
 
       return new Promise<string>((resolve, reject) => {
         uploadTask.on('state_changed', 
           (snapshot) => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            if (onProgress) onProgress(progress);
+            const elapsed = (Date.now() - startTime) / 1000;
+            const speed = snapshot.bytesTransferred / elapsed;
+            const remainingBytes = snapshot.totalBytes - snapshot.bytesTransferred;
+            const eta = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
+            
+            if (onProgress) onProgress(progress, eta);
           }, 
           (error) => reject(error), 
           async () => {
@@ -79,7 +85,7 @@ export const syncService = {
 
   saveProduct: async (
     product: Product, 
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number, eta: number) => void
   ): Promise<Product> => {
     try {
       let mainImageUrl = product.image;
@@ -100,10 +106,10 @@ export const syncService = {
       let completedUploads = 0;
       const totalUploads = imagesToUpload.length || 1;
 
-      const handleInternalProgress = (p: number) => {
+      const handleInternalProgress = (p: number, eta: number) => {
         if (onProgress) {
           const overallProgress = ((completedUploads + (p / 100)) / totalUploads) * 100;
-          onProgress(overallProgress);
+          onProgress(overallProgress, eta);
         }
       };
 
