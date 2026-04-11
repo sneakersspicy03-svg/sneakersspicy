@@ -71,6 +71,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [uploading, setUploading] = useState<{ [id: string]: boolean }>({});
 
   const compressImage = (base64: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -133,6 +134,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   };
 
   const handleSaveProduct = async () => {
+    // A) Validación de datos
     let finalSizes: (string | number)[] = [];
     if (addType === 'shoes') finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
     else if (addType === 'sportwear') finalSizes = selectedSportwearSizes;
@@ -141,26 +143,58 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     if (!newProduct.name || !newProduct.brand || !newProduct.price || !newProduct.images.front) {
       return alert("⚠️ Faltan datos críticos.");
     }
-    
-    setIsSaving(true);
-    try {
-      const productToSave: Product = {
-        id: `spicy-${Date.now()}`, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, 
-        category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), 
-        availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }, isSoldOut: false
-      };
-      const savedProduct = await syncService.saveProduct(productToSave);
-      await onAddProduct(savedProduct);
-      alert(`✅ ¡Éxito! "${savedProduct.name}" publicado.`);
-      setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
-      setSizesText('');
-      setSelectedSportwearSizes([]);
-      setActiveTab('inventory');
-    } catch (error) {
-      alert("⚠️ Error al publicar.");
-    } finally {
-      setIsSaving(false);
-    }
+
+    const productId = `spicy-${Date.now()}`;
+    const productToSave: Product = {
+      id: productId, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, 
+      category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), 
+      availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }, isSoldOut: false
+    };
+
+    // B) Asigna un estado de "Subiendo" a nivel de componente
+    setUploading(prev => ({ ...prev, [productId]: true }));
+
+    // C) Llama a syncService.saveProduct de forma asíncrona sin bloquear la UI
+    // Usamos una función autoejecutable para manejar la promesa en segundo plano
+    (async () => {
+      try {
+        // Limpiamos el formulario inmediatamente para permitir seguir trabajando
+        setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
+        setSizesText('');
+        setSelectedSportwearSizes([]);
+        setActiveTab('inventory');
+
+        // Agregamos el producto localmente (optimista)
+        await onAddProduct(productToSave);
+
+        // Subida Real a Firebase
+        await syncService.saveProduct(productToSave);
+
+        // D) SI TIENE ÉXITO: Recarga y desmarca
+        if (onLoadTestData) await onLoadTestData();
+        setUploading(prev => {
+          const newState = { ...prev };
+          delete newState[productId];
+          return newState;
+        });
+        
+        console.log(`✅ Producto ${productId} sincronizado con éxito.`);
+      } catch (error: any) {
+        // SI FALLA: alert con mensaje exacto y eliminación del estado temporal
+        console.error("Critical Upload Failure:", error);
+        alert(`❌ ERROR DE FIREBASE: ${error.message || "Fallo en la sincronización"}\n\nEl producto "${productToSave.name}" no se pudo guardar. Revise su conexión o permisos.`);
+        
+        // Eliminamos del estado local (rollback)
+        await onDeleteProduct(productId);
+        
+        // Limpiamos estado de subida
+        setUploading(prev => {
+          const newState = { ...prev };
+          delete newState[productId];
+          return newState;
+        });
+      }
+    })();
   };
 
   const handleSaveNewBanner = async () => {
@@ -179,7 +213,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: marqueeUrl });
       setShowAddBannerForm({section: null}); 
       setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
-    } catch (e) { alert("Error subiendo banner."); } finally { setIsSaving(false); }
+    } catch (e: any) { alert(`Error subiendo banner: ${e.message}`); } finally { setIsSaving(false); }
   };
 
   const handleSaveEditBanner = async () => {
@@ -194,7 +228,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       else if (editingBanner.type === 'sportwear') onUpdateCategory(updatedData);
       setEditingBanner(null);
       alert("✅ Banner actualizado.");
-    } catch (e) { alert("Error."); } finally { setIsSaving(false); }
+    } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
   };
 
   const migrateHistoricalData = async () => {
@@ -206,7 +240,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       if (oldData.SPORTWEAR_CATEGORIES) for (const c of oldData.SPORTWEAR_CATEGORIES) { const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`); onAddCategory({ ...c, image: url }); }
       if (oldData.PRODUCTS) for (const p of oldData.PRODUCTS) { await syncService.saveProduct(p); }
       alert("✅ Migración Completa."); if (onLoadTestData) await onLoadTestData();
-    } catch (e) { alert("❌ Error."); } finally { setIsMigrating(false); }
+    } catch (e: any) { alert(`❌ Error: ${e.message}`); } finally { setIsMigrating(false); }
   };
 
   if (!isOpen) return null;
@@ -219,7 +253,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         {isSaving && (
           <div className="absolute inset-0 z-[200] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
             <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-white font-black uppercase tracking-[0.3em] text-[10px]">Sincronizando con Spicy Vault...</p>
+            <p className="text-white font-black uppercase tracking-[0.3em] text-[10px]">Actualizando Configuración...</p>
           </div>
         )}
 
@@ -267,8 +301,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <textarea placeholder="Reseña Técnica" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold h-32" />
                   <input placeholder="Tallas (EJ: 7, 8.5, 10)" value={sizesText} onChange={e => setSizesText(e.target.value)} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
                   <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
-                  <button onClick={handleSaveProduct} disabled={isSaving} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl disabled:opacity-50">
-                    {isSaving ? "GUARDANDO..." : "PUBLICAR PRODUCTO"}
+                  <button onClick={handleSaveProduct} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl">
+                    PUBLICAR PRODUCTO
                   </button>
                 </div>
                 <div className="space-y-6">
@@ -375,7 +409,15 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                <h2 className="text-4xl font-black italic uppercase tracking-tighter border-l-4 border-red-600 pl-4">Stock de Productos</h2>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {products.map(p => (
-                   <div key={p.id} className="bg-zinc-900/50 p-4 rounded-[2rem] flex items-center justify-between border border-white/5 group hover:border-white/10 transition-all">
+                   <div key={p.id} className="bg-zinc-900/50 p-4 rounded-[2rem] flex items-center justify-between border border-white/5 group hover:border-white/10 transition-all relative overflow-hidden">
+                     
+                     {uploading[p.id] && (
+                       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex items-center justify-center space-x-3">
+                         <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                         <span className="text-[8px] font-black uppercase tracking-widest">Sincronizando...</span>
+                       </div>
+                     )}
+
                      <div className="flex items-center space-x-5">
                        <div className="w-16 h-16 bg-black rounded-2xl border border-white/5 overflow-hidden"> <img src={p.image} className="w-full h-full object-cover" /> </div>
                        <div>

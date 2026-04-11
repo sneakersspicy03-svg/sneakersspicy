@@ -29,9 +29,7 @@ export interface GlobalState {
 }
 
 export const syncService = {
-  // SUBIDA INDIVIDUAL DE IMÁGENES (SÍNCRONA Y ROBUSTA)
   uploadImage: async (base64Data: string, fileName: string): Promise<string> => {
-    // Si no es Base64, devolver tal cual (ya es una URL)
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     
     try {
@@ -55,15 +53,14 @@ export const syncService = {
     }
   },
 
-  // GUARDADO DE PRODUCTO (FLUJO SÍNCRONO BLOQUEANTE)
   saveProduct: async (product: Product): Promise<Product> => {
     try {
-      console.log(`🚀 Iniciando persistencia para: ${product.name}`);
+      console.log(`🚀 Iniciando persistencia honesta para: ${product.name}`);
       let mainImageUrl = product.image;
       
-      // 1. Procesar Imagen Principal
+      // 1. Procesar Imagen Principal si es Base64
       if (mainImageUrl.startsWith('data:image/')) {
-        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main`);
+        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main_${Date.now()}`);
       }
       
       // 2. Procesar Galería de Imágenes
@@ -71,14 +68,14 @@ export const syncService = {
       if (product.images) {
         for (const [key, val] of Object.entries(product.images)) {
           if (typeof val === 'string' && val.startsWith('data:image/')) {
-            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}`);
+            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}_${Date.now()}`);
           } else {
             updatedImages[key] = val;
           }
         }
       }
 
-      // 3. Crear objeto final limpio (SIN BASE64)
+      // 3. Objeto final sin Base64
       const finalProduct = { 
         ...product, 
         image: mainImageUrl, 
@@ -86,22 +83,22 @@ export const syncService = {
         lastUpdated: Date.now() 
       };
 
-      // 4. Persistir en Firestore
+      // 4. Persistencia en Firestore (Bloqueante para el proceso async)
       const docRef = doc(db, "productos", product.id);
       await setDoc(docRef, finalProduct);
       
-      console.log(`✅ Producto persistido con éxito en Firebase: ${product.id}`);
+      console.log(`✅ Producto persistido con éxito: ${product.id}`);
       return finalProduct;
     } catch (error) {
       console.error('Firebase Save Product Error:', error);
-      throw error;
+      throw error; // Re-lanzamos para que el componente maneje el rollback
     }
   },
 
   uploadBannerImage: async (base64Data: string, bannerName: string): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     try {
-      const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}`);
+      const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`);
       const response = await fetch(base64Data);
       const blob = await response.blob();
       const uploadTask = uploadBytesResumable(storageRef, blob);
@@ -109,7 +106,7 @@ export const syncService = {
       return await getDownloadURL(storageRef);
     } catch (error) {
       console.error('Banner Storage Error:', error);
-      return base64Data;
+      throw error;
     }
   },
 
@@ -148,7 +145,14 @@ export const syncService = {
           lastUpdated: configData.lastUpdated || Date.now()
         } as GlobalState;
       }
-      return productsList.length > 0 ? { products: productsList, categories: [], tennisBrands: [], socksBrands: [], logo: null, lastUpdated: Date.now() } : null;
+      return productsList.length > 0 ? { 
+        products: productsList, 
+        categories: [], 
+        tennisBrands: [], 
+        socksBrands: [], 
+        logo: null, 
+        lastUpdated: Date.now() 
+      } : null;
     } catch (error) {
       console.error('Firebase Fetch Error:', error);
       return null;
