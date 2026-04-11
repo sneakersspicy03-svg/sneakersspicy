@@ -32,33 +32,39 @@ export const syncService = {
   uploadImage: async (
     base64Data: string, 
     fileName: string, 
-    onProgress?: (progress: number, eta: number) => void
+    onProgress?: (progress: number, eta: number, speed: number) => void
   ): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     
     try {
       const storageRef = ref(storage, `products/${fileName}`);
       
+      // 1. Pesar y convertir la imagen estrictamente a Blob
       const response = await fetch(base64Data);
       const blob = await response.blob();
+      
       const uploadTask = uploadBytesResumable(storageRef, blob);
       const startTime = Date.now();
 
       return new Promise<string>((resolve, reject) => {
         uploadTask.on('state_changed', 
           (snapshot) => {
+            // 2. Matemática de progreso y velocidad (Senior Performance Implementation)
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            const elapsed = (Date.now() - startTime) / 1000;
-            const speed = snapshot.bytesTransferred / elapsed;
+            const elapsedTime = (Date.now() - startTime) / 1000; // en segundos
+            const speed = elapsedTime > 0 ? snapshot.bytesTransferred / elapsedTime : 0; // bytes por segundo
             const remainingBytes = snapshot.totalBytes - snapshot.bytesTransferred;
-            const eta = speed > 0 ? Math.ceil(remainingBytes / speed) : 0;
+            const etaSeconds = speed > 0 ? remainingBytes / speed : 0; 
             
-            if (onProgress) onProgress(progress, eta);
+            if (onProgress) onProgress(progress, etaSeconds, speed);
           }, 
-          (error) => reject(error), 
+          (error) => {
+            console.error("Upload Task Error:", error);
+            reject(error);
+          }, 
           async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(url);
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve(downloadURL);
           }
         );
       });
@@ -85,7 +91,7 @@ export const syncService = {
 
   saveProduct: async (
     product: Product, 
-    onProgress?: (progress: number, eta: number) => void
+    onProgress?: (progress: number, eta: number, speed: number) => void
   ): Promise<Product> => {
     try {
       let mainImageUrl = product.image;
@@ -106,10 +112,10 @@ export const syncService = {
       let completedUploads = 0;
       const totalUploads = imagesToUpload.length || 1;
 
-      const handleInternalProgress = (p: number, eta: number) => {
+      const handleInternalProgress = (p: number, eta: number, speed: number) => {
         if (onProgress) {
           const overallProgress = ((completedUploads + (p / 100)) / totalUploads) * 100;
-          onProgress(overallProgress, eta);
+          onProgress(overallProgress, eta, speed);
         }
       };
 

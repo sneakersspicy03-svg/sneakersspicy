@@ -76,6 +76,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [activeUpload, setActiveUpload] = useState<Product | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadETA, setUploadETA] = useState<number | null>(null);
+  const [uploadSpeed, setUploadSpeed] = useState<number>(0);
 
   // DESPACHADOR DE COLA SECUENCIAL (ARQUITECTURA DE FONDO)
   useEffect(() => {
@@ -87,21 +88,24 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       setActiveUpload(nextProduct);
       setUploadProgress(0);
       setUploadETA(null);
+      setUploadSpeed(0);
 
       try {
-        const savedProduct = await syncService.saveProduct(nextProduct, (progress, eta) => {
+        const savedProduct = await syncService.saveProduct(nextProduct, (progress, eta, speed) => {
           setUploadProgress(progress);
           setUploadETA(eta);
+          setUploadSpeed(speed);
         });
         
         await onUpdateProduct(savedProduct);
-        console.log(`✅ [COLA] Completado: ${savedProduct.name}`);
+        console.log(`✅ [COLA] Completado: ${savedProduct.name} @ ${(uploadSpeed / 1024).toFixed(2)} KB/s`);
       } catch (error) {
         console.error("❌ [COLA] Fallo Crítico:", error);
       } finally {
         setActiveUpload(null);
         setUploadProgress(0);
         setUploadETA(null);
+        setUploadSpeed(0);
       }
     };
 
