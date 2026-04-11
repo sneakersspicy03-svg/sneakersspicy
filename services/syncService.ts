@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc } from "firebase/firestore";
-import { getStorage, ref, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { getStorage, ref, getDownloadURL, uploadBytes } from "firebase/storage";
 import { Product, SportwearCategory, BrandStock } from '../types';
 
 const firebaseConfig = { 
@@ -29,104 +29,75 @@ export interface GlobalState {
 }
 
 export const syncService = {
+  // SUBIDA ATÓMICA DE IMÁGENES
   uploadImage: async (base64Data: string, fileName: string): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
     
-    try {
-      const storageRef = ref(storage, `products/${fileName}`);
-      const response = await fetch(base64Data);
-      const blob = await response.blob();
-      const uploadTask = uploadBytesResumable(storageRef, blob);
+    // Sin catch interno: dejamos que el error suba al componente
+    const storageRef = ref(storage, `products/${fileName}`);
+    const response = await fetch(base64Data);
+    const blob = await response.blob();
+    const metadata = { contentType: 'image/jpeg' }; 
 
-      return new Promise<string>((resolve, reject) => {
-        uploadTask.on('state_changed', null, 
-          (error) => reject(error), 
-          async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(url);
-          }
-        );
-      });
-    } catch (error) {
-      console.error('Critical Upload Error:', error);
-      throw error;
-    }
+    const snapshot = await uploadBytes(storageRef, blob, metadata);
+    return await getDownloadURL(snapshot.ref);
   },
 
+  // PERSISTENCIA TOTAL: Retorna confirmación o lanza error
   saveProduct: async (product: Product): Promise<Product> => {
-    try {
-      console.log(`🚀 Iniciando persistencia honesta para: ${product.name}`);
-      let mainImageUrl = product.image;
-      
-      // 1. Procesar Imagen Principal si es Base64
-      if (mainImageUrl.startsWith('data:image/')) {
-        mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main_${Date.now()}`);
-      }
-      
-      // 2. Procesar Galería de Imágenes
-      const updatedImages: any = {};
-      if (product.images) {
-        for (const [key, val] of Object.entries(product.images)) {
-          if (typeof val === 'string' && val.startsWith('data:image/')) {
-            updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}_${Date.now()}`);
-          } else {
-            updatedImages[key] = val;
-          }
+    console.log(`📡 SRE: Iniciando persistencia atómica para: ${product.name}`);
+    let mainImageUrl = product.image;
+    
+    // 1. Storage: Imagen Principal
+    if (mainImageUrl.startsWith('data:image/')) {
+      mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main_${Date.now()}`);
+    }
+    
+    // 2. Storage: Galería
+    const updatedImages: any = {};
+    if (product.images) {
+      for (const [key, val] of Object.entries(product.images)) {
+        if (typeof val === 'string' && val.startsWith('data:image/')) {
+          updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}_${Date.now()}`);
+        } else {
+          updatedImages[key] = val;
         }
       }
-
-      // 3. Objeto final sin Base64
-      const finalProduct = { 
-        ...product, 
-        image: mainImageUrl, 
-        images: updatedImages,
-        lastUpdated: Date.now() 
-      };
-
-      // 4. Persistencia en Firestore (Bloqueante para el proceso async)
-      const docRef = doc(db, "productos", product.id);
-      await setDoc(docRef, finalProduct);
-      
-      console.log(`✅ Producto persistido con éxito: ${product.id}`);
-      return finalProduct;
-    } catch (error) {
-      console.error('Firebase Save Product Error:', error);
-      throw error; // Re-lanzamos para que el componente maneje el rollback
     }
+
+    const finalProduct = { 
+      ...product, 
+      image: mainImageUrl, 
+      images: updatedImages,
+      lastUpdated: Date.now() 
+    };
+
+    // 3. Firestore: Confirmación de Escritura
+    const docRef = doc(db, "productos", product.id);
+    await setDoc(docRef, finalProduct);
+    
+    console.log(`✅ SRE: Confirmación real recibida de Firebase para ${product.id}`);
+    return finalProduct;
   },
 
   uploadBannerImage: async (base64Data: string, bannerName: string): Promise<string> => {
     if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
-    try {
-      const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`);
-      const response = await fetch(base64Data);
-      const blob = await response.blob();
-      const uploadTask = uploadBytesResumable(storageRef, blob);
-      await uploadTask;
-      return await getDownloadURL(storageRef);
-    } catch (error) {
-      console.error('Banner Storage Error:', error);
-      throw error;
-    }
+    const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`);
+    const response = await fetch(base64Data);
+    const blob = await response.blob();
+    const metadata = { contentType: 'image/jpeg' };
+    
+    const snapshot = await uploadBytes(storageRef, blob, metadata);
+    return await getDownloadURL(snapshot.ref);
   },
 
   toggleStock: async (id: string, isSoldOut: boolean): Promise<void> => {
-    try {
-      const docRef = doc(db, "productos", id);
-      await updateDoc(docRef, { isSoldOut });
-    } catch (error) {
-      console.error('Toggle Stock Error:', error);
-      throw error;
-    }
+    const docRef = doc(db, "productos", id);
+    await updateDoc(docRef, { isSoldOut });
   },
 
   deleteProduct: async (id: string): Promise<void> => {
-    try {
-      await deleteDoc(doc(db, "productos", id));
-    } catch (error) {
-      console.error('Delete Product Error:', error);
-      throw error;
-    }
+    await deleteDoc(doc(db, "productos", id));
   },
 
   fetchState: async (): Promise<GlobalState | null> => {
@@ -145,14 +116,7 @@ export const syncService = {
           lastUpdated: configData.lastUpdated || Date.now()
         } as GlobalState;
       }
-      return productsList.length > 0 ? { 
-        products: productsList, 
-        categories: [], 
-        tennisBrands: [], 
-        socksBrands: [], 
-        logo: null, 
-        lastUpdated: Date.now() 
-      } : null;
+      return productsList.length > 0 ? { products: productsList, categories: [], tennisBrands: [], socksBrands: [], logo: null, lastUpdated: Date.now() } : null;
     } catch (error) {
       console.error('Firebase Fetch Error:', error);
       return null;
