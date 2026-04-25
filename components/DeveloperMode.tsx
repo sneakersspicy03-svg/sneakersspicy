@@ -73,17 +73,33 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [dbBrands, setDbBrands] = useState<string[]>([]);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'banners'), (snapshot) => {
-      const names = snapshot.docs.map(doc => doc.data().name as string);
+      const names = snapshot.docs.map(doc => doc.data().nombre || doc.data().name || "");
       setDbBrands(Array.from(new Set(names)).filter(Boolean).sort());
     });
     return () => unsubscribe();
   }, []);
 
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const resetForm = () => {
+    setEditingProductId(null);
+    setNewProduct({
+      name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo' as ProductCondition, 
+      images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }
+    });
+    setSizesText('');
+    setSelectedSportwearSizes([]);
+  };
+
+  const handleTabChange = (tab: 'inventory' | 'add' | 'banners' | 'config') => {
+    if (tab === 'add' && activeTab !== 'add') {
+      resetForm();
+    }
+    setActiveTab(tab);
+  };
 
   const handleEditProductClick = (p: Product) => {
     setEditingProductId(p.id);
@@ -279,10 +295,10 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
             <h3 className="text-red-600 font-black italic text-lg md:text-2xl tracking-tighter shrink-0">ADMIN_SPICY</h3>
             {isAuthorized && (
               <div className="flex bg-black/50 p-1 rounded-xl border border-white/5 whitespace-nowrap">
-                <button onClick={() => setActiveTab('inventory')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Stock</button>
-                <button onClick={() => setActiveTab('add')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'add' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>+ Nuevo</button>
-                <button onClick={() => setActiveTab('banners')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Banners</button>
-                <button onClick={() => setActiveTab('config')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'config' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>⚙️</button>
+                <button onClick={() => handleTabChange('inventory')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Stock</button>
+                <button onClick={() => handleTabChange('add')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'add' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>+ Nuevo</button>
+                <button onClick={() => handleTabChange('banners')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Banners</button>
+                <button onClick={() => handleTabChange('config')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'config' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>⚙️</button>
               </div>
             )}
           </div>

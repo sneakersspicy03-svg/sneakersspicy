@@ -32,8 +32,14 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
               const brandName = (cat.brand || 'Nike').toUpperCase();
               const title = cat.bannerTitle || cat.name;
 
-              // Calcular tallas dinámicas
-              const brandProducts = products.filter(p => (p.marca === cat.brand || p.brand === cat.brand) && p.category === cat.name && !p.isSoldOut);
+              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible y flexible
+              const brandProducts = products.filter(p => {
+                const bName = String(cat.brand || "").trim().toLowerCase();
+                const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
+                const pCat = String(p.category || "").trim().toLowerCase();
+                const cName = String(cat.name || "").trim().toLowerCase();
+                return pBrand === bName && pCat === cName && !p.isSoldOut;
+              });
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 

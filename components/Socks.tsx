@@ -30,8 +30,12 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
-              // Calcular tallas dinámicas
-              const brandProducts = products.filter(p => (p.marca === brand.name || p.brand === brand.name) && p.category === 'Medias' && !p.isSoldOut);
+              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible y flexible
+              const brandProducts = products.filter(p => {
+                const bName = String((brand as any).nombre || brand.name || "").trim().toLowerCase();
+                const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
+                return pBrand === bName && p.category === 'Medias' && !p.isSoldOut;
+              });
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 

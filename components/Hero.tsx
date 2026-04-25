@@ -45,8 +45,12 @@ const Hero: React.FC<HeroProps> = ({
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
-              // Calcular tallas dinámicas - REPARADO: Filtro por marca exacto
-              const brandProducts = products.filter(p => (p.marca === brand.name || p.brand === brand.name) && !p.isSoldOut);
+              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible a mayúsculas y flexible en campos
+              const brandProducts = products.filter(p => {
+                const brandName = String((brand as any).nombre || brand.name || "").trim().toLowerCase();
+                const prodMarca = String(p.marca || p.brand || "").trim().toLowerCase();
+                return prodMarca === brandName && !p.isSoldOut;
+              });
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => Number(a) - Number(b));
 
