@@ -153,12 +153,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteBanner = async (id: string, type: 'tennis' | 'socks' | 'sportwear') => {
+  const handleDeleteBanner = async (bannerId: string, type: 'tennis' | 'socks' | 'sportwear') => {
+    console.log("🔥 Iniciando borrado de banner. ID recibido:", bannerId, "Tipo:", type);
+    
+    if (!bannerId) {
+      alert("🚨 ERROR LÓGICO: El botón no está enviando el ID del banner.");
+      return;
+    }
+
     setIsPublishing(true);
     try {
-      await syncService.deleteBanner(id);
-    } catch (e) {
-      console.error("Error deleting banner:", e);
+      await syncService.deleteBanner(bannerId);
+      console.log("✅ Borrado exitoso en Firestore para el ID:", bannerId);
+    } catch (error: any) {
+      console.error("❌ Fallo de Firebase en eliminación:", error);
+      alert(`⚠️ Error bloqueando el borrado: ${error.message || 'Error desconocido'}`);
     } finally {
       setIsPublishing(false);
     }

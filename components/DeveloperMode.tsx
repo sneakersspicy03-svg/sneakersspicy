@@ -467,7 +467,16 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                         <div key={idx} className="bg-black/60 p-4 md:p-5 rounded-3xl border border-white/5 group relative hover:border-red-600/40 transition-all">
                           <div className="absolute top-4 right-4 flex space-x-2 z-20">
                             <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-3 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all"><svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                            <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Borrar permanentemente?')) { if(section === 'Calzado') onDeleteTennisBrand(item.id); else if(section === 'Medias') onDeleteSocksBrand(item.id); else onDeleteCategory(item.id); } }} className="p-3 bg-red-600/90 hover:bg-red-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all"><svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                            <button onClick={(e) => { 
+                              e.stopPropagation(); 
+                              const bannerId = item.id || (item as any).uid;
+                              console.log("🖱️ Clic en eliminar. Banner Data:", item);
+                              if(confirm(`¿Borrar permanentemente el banner de ${item.name || 'este elemento'}?`)) { 
+                                if(section === 'Calzado') onDeleteTennisBrand(bannerId); 
+                                else if(section === 'Medias') onDeleteSocksBrand(bannerId); 
+                                else onDeleteCategory(bannerId); 
+                              } 
+                            }} className="p-3 bg-red-600/90 hover:bg-red-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all"><svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                           </div>
                           <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4 relative">
                             <img src={item.marqueeImage || item.image} className="w-full h-full object-cover" alt={item.name} />
