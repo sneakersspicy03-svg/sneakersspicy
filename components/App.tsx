@@ -154,20 +154,20 @@ const App: React.FC = () => {
   };
 
   const handleDeleteBanner = async (bannerId: string, type: 'tennis' | 'socks' | 'sportwear') => {
-    console.log("🔥 Iniciando borrado de banner. ID recibido:", bannerId, "Tipo:", type);
+    console.log("🚀 Intentando borrar banner ID:", bannerId, "| Tipo:", type);
     
     if (!bannerId) {
-      alert("🚨 ERROR LÓGICO: El botón no está enviando el ID del banner.");
+      alert("🚨 ERROR: El banner no tiene un ID válido de Firebase.");
       return;
     }
 
     setIsPublishing(true);
     try {
       await syncService.deleteBanner(bannerId);
-      console.log("✅ Borrado exitoso en Firestore para el ID:", bannerId);
+      console.log("✅ Banner borrado exitosamente de Firestore.");
     } catch (error: any) {
-      console.error("❌ Fallo de Firebase en eliminación:", error);
-      alert(`⚠️ Error bloqueando el borrado: ${error.message || 'Error desconocido'}`);
+      console.error("❌ Error en Firestore:", error);
+      alert(`Error al borrar: ${error.message || 'Error desconocido'}`);
     } finally {
       setIsPublishing(false);
     }

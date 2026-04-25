@@ -469,8 +469,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                             <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-3 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all"><svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
                             <button onClick={(e) => { 
                               e.stopPropagation(); 
-                              const bannerId = item.id || (item as any).uid;
-                              console.log("🖱️ Clic en eliminar. Banner Data:", item);
+                              const bannerId = item.id;
+                              console.log("🖱️ Intento de borrado detectado para ID:", bannerId);
                               if(confirm(`¿Borrar permanentemente el banner de ${item.name || 'este elemento'}?`)) { 
                                 if(section === 'Calzado') onDeleteTennisBrand(bannerId); 
                                 else if(section === 'Medias') onDeleteSocksBrand(bannerId); 
