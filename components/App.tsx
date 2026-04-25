@@ -43,9 +43,9 @@ const App: React.FC = () => {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>('¡Hola! Quiero confirmar el siguiente pedido:\n\n[DETALLES]\n\n• TOTAL FINAL: [TOTAL]\n\n¿Tienen disponibilidad para entrega hoy?');
   const [currentProducts, setCurrentProducts] = useState<Product[]>([]);
-  const [currentCategories, setCurrentCategories] = useState<SportwearCategory[]>(SPORTWEAR_CATEGORIES);
-  const [tennisBrands, setTennisBrands] = useState<BrandStock[]>(TENNIS_BRANDS);
-  const [socksBrands, setSocksBrands] = useState<BrandStock[]>(SOCKS_BRANDS);
+  const [currentCategories, setCurrentCategories] = useState<SportwearCategory[]>([]);
+  const [tennisBrands, setTennisBrands] = useState<BrandStock[]>([]);
+  const [socksBrands, setSocksBrands] = useState<BrandStock[]>([]);
 
   useEffect(() => {
     const loadUniversalState = async () => {
@@ -53,10 +53,10 @@ const App: React.FC = () => {
       try {
         const cloudState = await syncService.fetchState();
         if (cloudState) {
-          setCurrentProducts(cloudState.products || PRODUCTS);
-          setCurrentCategories(cloudState.categories || SPORTWEAR_CATEGORIES);
-          setTennisBrands(cloudState.tennisBrands || TENNIS_BRANDS);
-          setSocksBrands(cloudState.socksBrands || SOCKS_BRANDS);
+          setCurrentProducts(cloudState.products || []);
+          setCurrentCategories(cloudState.categories || []);
+          setTennisBrands(cloudState.tennisBrands || []);
+          setSocksBrands(cloudState.socksBrands || []);
           setCustomLogo(cloudState.logo);
           if (cloudState.whatsappTemplate) setWhatsappTemplate(cloudState.whatsappTemplate);
           if (cloudState.tennisBrands && cloudState.tennisBrands.length > 0) setActiveBrand(cloudState.tennisBrands[0]);
@@ -68,10 +68,10 @@ const App: React.FC = () => {
         if (localInv) {
           try {
             const parsed = JSON.parse(localInv);
-            setCurrentProducts(parsed.products || PRODUCTS);
-            setCurrentCategories(parsed.categories || SPORTWEAR_CATEGORIES);
-            setTennisBrands(parsed.tennisBrands || TENNIS_BRANDS);
-            setSocksBrands(parsed.socksBrands || SOCKS_BRANDS);
+            setCurrentProducts(parsed.products || []);
+            setCurrentCategories(parsed.categories || []);
+            setTennisBrands(parsed.tennisBrands || []);
+            setSocksBrands(parsed.socksBrands || []);
             setCustomLogo(parsed.logo || null);
             if (parsed.whatsappTemplate) setWhatsappTemplate(parsed.whatsappTemplate);
           } catch (err) {}
@@ -89,22 +89,19 @@ const App: React.FC = () => {
       snapshot.forEach((doc) => {
         banners.push({ id: doc.id, ...doc.data() });
       });
-      
+
       const tBrands = banners.filter(b => b.type === 'tennis');
       const sBrands = banners.filter(b => b.type === 'socks');
       const cats = banners.filter(b => b.type === 'sportwear');
 
-      if (tBrands.length > 0 || banners.length > 0) {
-        setTennisBrands(tBrands.length > 0 ? tBrands : TENNIS_BRANDS);
-        setSocksBrands(sBrands.length > 0 ? sBrands : SOCKS_BRANDS);
-        setCurrentCategories(cats.length > 0 ? cats : SPORTWEAR_CATEGORIES);
-        
-        if (tBrands.length > 0 && !activeBrand) {
-           setActiveBrand(tBrands[0]);
-        }
+      setTennisBrands(tBrands);
+      setSocksBrands(sBrands);
+      setCurrentCategories(cats);
+
+      if (tBrands.length > 0 && !activeBrand) {
+         setActiveBrand(tBrands[0]);
       }
     });
-
     return () => unsubscribe();
   }, [activeBrand]);
 
@@ -133,11 +130,7 @@ const App: React.FC = () => {
   const handleAddBanner = async (banner: any, type: 'tennis' | 'socks' | 'sportwear') => {
     setIsPublishing(true);
     try {
-      const id = await syncService.saveBanner({ ...banner, type });
-      const newBanner = { ...banner, id, type };
-      if (type === 'tennis') setTennisBrands(prev => [...prev, newBanner]);
-      else if (type === 'socks') setSocksBrands(prev => [...prev, newBanner]);
-      else if (type === 'sportwear') setCurrentCategories(prev => [...prev, newBanner]);
+      await syncService.saveBanner({ ...banner, type });
     } catch (e) {
       console.error("Error adding banner:", e);
     } finally {
@@ -153,9 +146,6 @@ const App: React.FC = () => {
     setIsPublishing(true);
     try {
       await syncService.updateBanner(banner.id, banner);
-      if (type === 'tennis') setTennisBrands(prev => prev.map(b => b.id === banner.id ? banner : b));
-      else if (type === 'socks') setSocksBrands(prev => prev.map(b => b.id === banner.id ? banner : b));
-      else if (type === 'sportwear') setCurrentCategories(prev => prev.map(c => c.id === banner.id ? banner : c));
     } catch (e) {
       console.error("Error updating banner:", e);
     } finally {
@@ -167,9 +157,6 @@ const App: React.FC = () => {
     setIsPublishing(true);
     try {
       await syncService.deleteBanner(id);
-      if (type === 'tennis') setTennisBrands(prev => prev.filter(b => b.id !== id));
-      else if (type === 'socks') setSocksBrands(prev => prev.filter(b => b.id !== id));
-      else if (type === 'sportwear') setCurrentCategories(prev => prev.filter(c => c.id !== id));
     } catch (e) {
       console.error("Error deleting banner:", e);
     } finally {
@@ -302,21 +289,21 @@ const App: React.FC = () => {
           }
         }}
         onAddTennisBrand={nb => handleAddBanner(nb, 'tennis')}
-        onDeleteTennisBrand={name => {
-          const banner = tennisBrands.find(b => b.name === name);
-          if (banner?.id) handleDeleteBanner(banner.id, 'tennis');
+        onDeleteTennisBrand={id => {
+          if (!id) return alert("Error: ID de banner no encontrado.");
+          handleDeleteBanner(id, 'tennis');
         }}
         onUpdateTennisBrand={ub => handleUpdateBanner(ub, 'tennis')}
-        onAddSocksBrand={nb => handleAddBanner(nb, 'socks')}
-        onDeleteSocksBrand={name => {
-          const banner = socksBrands.find(b => b.name === name);
-          if (banner?.id) handleDeleteBanner(banner.id, 'socks');
+        onAddSocksBrand={ns => handleAddBanner(ns, 'socks')}
+        onDeleteSocksBrand={id => {
+          if (!id) return alert("Error: ID de banner no encontrado.");
+          handleDeleteBanner(id, 'socks');
         }}
         onUpdateSocksBrand={ub => handleUpdateBanner(ub, 'socks')}
         onAddCategory={nc => handleAddBanner(nc, 'sportwear')}
-        onDeleteCategory={name => {
-          const category = currentCategories.find(c => c.name === name);
-          if (category?.id) handleDeleteBanner(category.id, 'sportwear');
+        onDeleteCategory={id => {
+          if (!id) return alert("Error: ID de banner no encontrado.");
+          handleDeleteBanner(id, 'sportwear');
         }}
         onUpdateCategory={uc => handleUpdateBanner(uc, 'sportwear')}
         onReorderTennis={(s, t) => { const list = [...tennisBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setTennisBrands(list); publishState({ tennisBrands: list }); }}
