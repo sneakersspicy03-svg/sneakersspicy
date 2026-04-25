@@ -31,7 +31,7 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
               // Calcular tallas dinámicas
-              const brandProducts = products.filter(p => p.brand === brand.name && p.category === 'Medias' && !p.isSoldOut);
+              const brandProducts = products.filter(p => (p.marca === brand.name || p.brand === brand.name) && p.category === 'Medias' && !p.isSoldOut);
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 

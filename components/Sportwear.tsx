@@ -33,7 +33,7 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
               const title = cat.bannerTitle || cat.name;
 
               // Calcular tallas dinámicas
-              const brandProducts = products.filter(p => p.brand === cat.brand && p.category === cat.name && !p.isSoldOut);
+              const brandProducts = products.filter(p => (p.marca === cat.brand || p.brand === cat.brand) && p.category === cat.name && !p.isSoldOut);
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 

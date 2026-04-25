@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock } from '../types';
-import { syncService } from '../services/syncService';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { syncService, db } from '../services/syncService';
 
 interface DeveloperModeProps {
   logo?: string | null;
@@ -155,8 +156,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     }
 
     const productId = editingProductId || `spicy-${Date.now()}`;
-    const productToSave: Product = {
-      id: productId, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, 
+    const productToSave: any = {
+      id: productId, name: newProduct.name, brand: newProduct.brand, marca: newProduct.brand, price: newProduct.price, description: newProduct.description, 
       category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), 
       availableSizes: finalSizes, 
       image: newProduct.images.front, // Imagen principal mapeada desde front
@@ -195,9 +196,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
       else sizes = ['Talla Única'];
       const common = { name: newBannerData.name || newBannerData.title, marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
-      if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
-      else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
-      else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: newBannerData.image });
+      if (showAddBannerForm.section === 'Calzado') await onAddTennisBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
+      else if (showAddBannerForm.section === 'Medias') await onAddSocksBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
+      else if (showAddBannerForm.section === 'Sportwear') await onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: newBannerData.image });
       setShowAddBannerForm({section: null}); 
       setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
     } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
@@ -207,13 +208,46 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     if (!editingBanner) return;
     setIsSaving(true);
     try {
-      const updatedData = { ...editingBanner.data, marqueeImage: editingBanner.data.marqueeImage, image: editingBanner.data.image };
-      if (editingBanner.type === 'tennis') onUpdateTennisBrand(updatedData);
-      else if (editingBanner.type === 'socks') onUpdateSocksBrand(updatedData);
-      else if (editingBanner.type === 'sportwear') onUpdateCategory(updatedData);
+      const bannerId = editingBanner.data.id;
+      const updatedData = { 
+        ...editingBanner.data, 
+        marqueeImage: editingBanner.data.marqueeImage || editingBanner.data.image, 
+        image: editingBanner.data.image || editingBanner.data.marqueeImage,
+        lastUpdated: Date.now()
+      };
+
+      // QA FIX: Si el banner no tiene ID (es de las constantes), lo creamos en Firestore
+      if (!bannerId) {
+        const newId = `banner-${Date.now()}`;
+        updatedData.id = newId;
+        const bannerRef = doc(db, 'banners', newId);
+        await setDoc(bannerRef, { ...updatedData, type: editingBanner.type });
+      } else {
+        // REPARAR BUG: Actualización directa en Firestore según instrucciones
+        const bannerRef = doc(db, 'banners', bannerId);
+        await updateDoc(bannerRef, { 
+          name: updatedData.name || '',
+          bannerTitle: updatedData.bannerTitle || '',
+          bannerSubtitle: updatedData.bannerSubtitle || '',
+          marqueeImage: updatedData.marqueeImage || '',
+          image: updatedData.image || '',
+          lastUpdated: updatedData.lastUpdated
+        });
+      }
+
+      // Sincronizar estado local (AWAITED para QA)
+      if (editingBanner.type === 'tennis') await onUpdateTennisBrand(updatedData);
+      else if (editingBanner.type === 'socks') await onUpdateSocksBrand(updatedData);
+      else if (editingBanner.type === 'sportwear') await onUpdateCategory(updatedData);
+
       setEditingBanner(null);
-      alert("✅ Banner actualizado.");
-    } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
+      alert("✅ Banner actualizado en base de datos.");
+    } catch (e: any) { 
+      console.error("Error al actualizar banner:", e);
+      alert(`❌ Error de persistencia: ${e.message}`); 
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   if (!isOpen) return null;
@@ -274,7 +308,16 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                 <div className="space-y-8">
                   <div className="grid grid-cols-2 gap-4">
                     <input placeholder="Modelo" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold" />
-                    <input placeholder="Marca" value={newProduct.brand} onChange={e => setNewProduct({...newProduct, brand: e.target.value})} className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold" />
+                    <select 
+                      value={newProduct.brand} 
+                      onChange={e => setNewProduct({...newProduct, brand: e.target.value})} 
+                      className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold text-white appearance-none cursor-pointer hover:border-red-600/50 transition-colors"
+                    >
+                      <option value="" disabled>Seleccionar Marca</option>
+                      {[...tennisBrands, ...socksBrands, ...categories].map((b, idx) => (
+                        <option key={idx} value={b.name}>{b.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <textarea placeholder="Reseña Técnica" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold h-32" />
                   <input placeholder="Tallas (EJ: 7, 8.5, 10)" value={sizesText} onChange={e => setSizesText(e.target.value)} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
@@ -326,6 +369,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                 <div className="bg-zinc-900 p-8 rounded-[2rem] border border-red-600/50 space-y-6 animate-scale-in shadow-2xl">
                   <h5 className="text-lg font-black uppercase text-red-600 italic">Editar Banner: {editingBanner.data.name}</h5>
                   <div className="grid grid-cols-1 gap-4">
+                    <input value={editingBanner.data.name} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, name: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-400" placeholder="Nombre de Marca (Nike, Jordan...)" />
                     <input value={editingBanner.data.bannerTitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerTitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco" />
                     <input value={editingBanner.data.bannerSubtitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerSubtitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris" />
                     <div className="flex items-center space-x-4">

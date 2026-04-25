@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../constants';
 import { Product, CartItem, BrandStock, FilterState, SportwearCategory } from '../types';
 import { syncService, GlobalState, db } from '../services/syncService';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import Header from './Header';
 // ... rest of imports
 import Hero from './Hero';
@@ -146,7 +146,10 @@ const App: React.FC = () => {
   };
 
   const handleUpdateBanner = async (banner: any, type: 'tennis' | 'socks' | 'sportwear') => {
-    if (!banner.id) return;
+    if (!banner.id) {
+      console.warn("QA Warning: Banner sin ID detectado, redireccionando a creación.");
+      return handleAddBanner(banner, type);
+    }
     setIsPublishing(true);
     try {
       await syncService.updateBanner(banner.id, banner);
@@ -176,12 +179,32 @@ const App: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     return currentProducts.filter(p => {
-      const bMatch = !filters.brand || p.brand === filters.brand;
+      const bMatch = !filters.brand || p.marca === filters.brand || p.brand === filters.brand;
       const sMatch = !filters.size || (p.availableSizes && p.availableSizes.map(String).includes(String(filters.size)));
       const cMatch = !filters.category || p.category === filters.category;
       return bMatch && sMatch && cMatch;
     });
   }, [currentProducts, filters]);
+
+  // REPARAR VINCULACIÓN: Consulta directa a Firestore por marca
+  useEffect(() => {
+    if (filters.brand) {
+      const q = query(collection(db, 'productos'), where('marca', '==', filters.brand));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const brandSpecificProducts: Product[] = [];
+        snapshot.forEach((doc) => {
+          brandSpecificProducts.push({ id: doc.id, ...doc.data() } as Product);
+        });
+        
+        // Sincronizar con el estado global sin duplicar
+        setCurrentProducts(prev => {
+          const otherProducts = prev.filter(p => p.marca !== filters.brand && p.brand !== filters.brand);
+          return [...brandSpecificProducts, ...otherProducts];
+        });
+      });
+      return () => unsubscribe();
+    }
+  }, [filters.brand]);
 
   const handleSelectSize = (brand: string, size: number | string, category?: string) => {
     setFilters({ brand, size, category: category || null });

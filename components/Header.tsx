@@ -56,12 +56,20 @@ const Header: React.FC<HeaderProps> = ({
 
       <div className="flex items-center space-x-3 md:space-x-6">
         {isAdminAuthorized && (
-          <button 
-            onClick={onToggleDevMode} 
-            className={`px-5 py-2.5 rounded-xl border-2 transition-all font-black text-[10px] tracking-widest uppercase ${isDevMode ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'border-white/10 text-zinc-500 hover:border-red-500 hover:text-red-500'}`}
-          >
-            {isDevMode ? 'SALIR ADMIN' : 'MODO ADMIN'}
-          </button>
+          <>
+            <button 
+              onClick={onOpenDev} 
+              className="px-5 py-2.5 rounded-xl border-2 border-white/10 text-zinc-500 hover:border-white hover:text-white transition-all font-black text-[10px] tracking-widest uppercase"
+            >
+              Panel Dev
+            </button>
+            <button 
+              onClick={onToggleDevMode} 
+              className={`px-5 py-2.5 rounded-xl border-2 transition-all font-black text-[10px] tracking-widest uppercase ${isDevMode ? 'bg-red-600 border-red-600 text-white hover:bg-red-700 shadow-[0_0_20px_rgba(220,38,38,0.4)]' : 'border-white/10 text-zinc-500 hover:border-red-500 hover:text-red-500'}`}
+            >
+              {isDevMode ? 'SALIR ADMIN' : 'MODO ADMIN'}
+            </button>
+          </>
         )}
 
         <button 
