@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock } from '../types';
-import { doc, updateDoc, setDoc, collection, onSnapshot, query, where } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { syncService, db } from '../services/syncService';
 
 interface DeveloperModeProps {
@@ -290,25 +290,17 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     }
   };
 
-  const handleDeleteBanner = async (bannerId: string, type: 'tennis' | 'socks' | 'sportwear') => {
+  const handleDeleteBanner = async (bannerId: string) => {
+    alert(`Iniciando borrado para ID: ${bannerId}`);
     if (!bannerId) {
-      alert("🚨 ERROR: El banner no tiene un ID válido de Firebase.");
+      alert("❌ ERROR: No se encontró el ID del banner.");
       return;
     }
-
-    if(confirm(`⚠️ ¿Borrar permanentemente este banner?`)) {
-      setIsSaving(true);
-      try {
-        await syncService.deleteBanner(bannerId);
-        if (type === 'tennis') onDeleteTennisBrand(bannerId);
-        else if (type === 'socks') onDeleteSocksBrand(bannerId);
-        else onDeleteCategory(bannerId);
-        alert("✅ Banner eliminado.");
-      } catch (error: any) {
-        alert(`❌ Error al borrar: ${error.message || 'Error desconocido'}`);
-      } finally {
-        setIsSaving(false);
-      }
+    try {
+      await deleteDoc(doc(db, 'banners', bannerId));
+      alert("✅ BANNER BORRADO EXITOSAMENTE DE FIREBASE");
+    } catch (error: any) {
+      alert(`❌ ERROR DE FIREBASE: ${error.message}`);
     }
   };
 
@@ -493,9 +485,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                const targetId = item.id || (item as any).uid;
-                                const type = section === 'Calzado' ? 'tennis' : (section === 'Medias' ? 'socks' : 'sportwear');
-                                handleDeleteBanner(targetId, type);
+                                handleDeleteBanner(item.id || (item as any).uid);
                               }} 
                               className="p-3 bg-red-600/90 hover:bg-red-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all relative z-50 pointer-events-auto"
                             >
