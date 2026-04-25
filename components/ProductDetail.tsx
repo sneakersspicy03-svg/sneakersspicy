@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Product, ProductCondition } from '../types';
 
 interface ProductDetailProps {
@@ -22,6 +22,18 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
   const [selectedSize, setSelectedSize] = useState<number | string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
+
+  useEffect(() => {
+    if (product.availableSizes && product.availableSizes.length === 1) {
+      const singleSize = product.availableSizes[0];
+      const isSoldOut = product.isSoldOut || (product.soldOutSizes && product.soldOutSizes.map(String).includes(String(singleSize)));
+      if (!isSoldOut) {
+        setSelectedSize(singleSize);
+      }
+    } else {
+      setSelectedSize(null);
+    }
+  }, [product]);
 
   const SELLER_PHONE = "18299745066"; 
 
@@ -84,20 +96,24 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
       
       <div className="relative w-full h-full md:max-w-6xl md:h-auto lg:h-[85vh] bg-zinc-950 md:rounded-[3rem] border border-white/10 flex flex-col md:flex-row overflow-hidden shadow-[0_0_80px_rgba(220,38,38,0.2)]">
         
-        <button onClick={onClose} className="absolute top-6 right-6 z-50 p-3 bg-black/60 hover:bg-red-600 text-white rounded-full transition-all border border-white/10 backdrop-blur-md group">
+        <button onClick={onClose} className="absolute top-4 right-4 z-[60] p-3 bg-black/60 hover:bg-red-600 text-white rounded-full transition-all border border-white/10 backdrop-blur-md group shadow-2xl">
           <svg className="w-6 h-6 group-hover:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
 
-        <div className="w-full md:w-1/2 h-[40vh] md:h-full bg-zinc-900/30 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-white/5">
-          <div className="flex-1 p-8 flex items-center justify-center overflow-hidden">
-            <img src={activeImage} className="max-w-full max-h-full object-contain transition-transform duration-700 hover:scale-110 drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]" alt={product.name} />
+        <div className="w-full md:w-1/2 h-[60vh] md:h-full bg-black flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-white/5 overflow-hidden">
+          <div className="flex-1 p-2 md:p-8 flex items-center justify-center overflow-hidden touch-pan-y touch-pinch-zoom">
+            <img 
+              src={activeImage} 
+              className="w-full h-full object-contain transition-transform duration-500 hover:scale-110 md:hover:scale-125 drop-shadow-[0_20px_40px_rgba(0,0,0,0.9)] cursor-zoom-in touch-action-pinch-zoom" 
+              alt={product.name} 
+            />
           </div>
-          <div className="h-24 p-4 bg-black/40 flex justify-center items-center space-x-3 overflow-x-auto no-scrollbar">
+          <div className="h-24 md:h-24 p-3 md:p-4 bg-zinc-900/20 backdrop-blur-md flex justify-start md:justify-center items-center space-x-3 overflow-x-auto snap-x snap-mandatory no-scrollbar border-t border-white/5">
             {galleryImages.map((img, i) => (
               <button 
                 key={i} 
                 onClick={() => setActiveImage(img.url)} 
-                className={`w-14 h-14 rounded-xl overflow-hidden border-2 transition-all shrink-0 ${activeImage === img.url ? 'border-red-600 scale-110' : 'border-white/5 opacity-40 hover:opacity-100'}`}
+                className={`w-16 h-16 md:w-14 md:h-14 rounded-2xl md:rounded-xl overflow-hidden border-2 transition-all shrink-0 snap-center ${activeImage === img.url ? 'border-red-600 scale-105 shadow-lg shadow-red-900/40' : 'border-white/5 opacity-40 hover:opacity-100'}`}
               >
                 <img src={img.url} className="w-full h-full object-cover" alt="" />
               </button>

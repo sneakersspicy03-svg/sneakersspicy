@@ -66,32 +66,68 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [editingBanner, setEditingBanner] = useState<{type: 'tennis' | 'socks' | 'sportwear', data: any} | null>(null);
 
   const [newProduct, setNewProduct] = useState({
-    name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo' as ProductCondition, images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }
+    name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo' as ProductCondition, 
+    images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
-  const [uploading, setUploading] = useState<{ [id: string]: boolean }>({});
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-  const compressImage = (base64: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = base64;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 1200;
-        let width = img.width;
-        let height = img.height;
-        if (width > MAX_WIDTH) { height = (MAX_WIDTH / width) * height; width = MAX_WIDTH; }
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        let quality = 0.7;
-        let result = canvas.toDataURL('image/jpeg', quality);
-        while (result.length * 0.75 > 400 * 1024 && quality > 0.1) { quality -= 0.05; result = canvas.toDataURL('image/jpeg', quality); }
-        resolve(result);
-      };
+  const handleEditProductClick = (p: Product) => {
+    setEditingProductId(p.id);
+    setAddType(p.category === 'Shoes' ? 'shoes' : (p.category === 'Medias' ? 'socks' : 'sportwear'));
+    setNewProduct({
+      name: p.name, brand: p.brand, price: p.price, description: p.description || '', 
+      category: p.category, condition: (p as any).condition || 'nuevo',
+      images: {
+        front: p.images?.front || p.image || '',
+        back: p.images?.back || '',
+        left: p.images?.left || '',
+        right: p.images?.right || '',
+        top: p.images?.top || '',
+        bottom: p.images?.bottom || '',
+      }
     });
+    setSizesText(p.availableSizes ? p.availableSizes.join(', ') : '');
+    setSelectedSportwearSizes(p.category === 'Sportwear' ? p.availableSizes.map(String) : []);
+    setActiveTab('add');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, slot: string, target: 'product' | 'banner' | 'logo' = 'product') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsSaving(true);
+    try {
+      // Identificar imagen antigua para borrar
+      let oldUrl: string | null = null;
+      if (target === 'product') {
+        oldUrl = (newProduct.images as any)[slot] || null;
+      } else if (target === 'banner') {
+        oldUrl = editingBanner ? (editingBanner.data.marqueeImage || editingBanner.data.image) : newBannerData.image;
+      } else if (target === 'logo') {
+        oldUrl = logo || null;
+      }
+
+      const url = await syncService.uploadImage(file);
+      
+      if (target === 'product') {
+        setNewProduct(prev => ({ ...prev, images: { ...prev.images, [slot]: url } }));
+      } else if (target === 'banner') {
+        if (editingBanner) {
+          setEditingBanner({ ...editingBanner, data: { ...editingBanner.data, marqueeImage: url, image: url } });
+        } else {
+          setNewBannerData(prev => ({ ...prev, image: url }));
+        }
+      } else if (target === 'logo') {
+        onUpdateLogo(url);
+      }
+    } catch (error: any) {
+      alert(`❌ Error al subir a Cloudinary: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -108,31 +144,6 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     else alert('⚠️ Error: Credenciales incorrectas.');
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, key: keyof ProductImages) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const base64 = ev.target?.result as string;
-        const compressed = await compressImage(base64);
-        setNewProduct(prev => ({ ...prev, images: { ...prev.images, [key]: compressed } }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const compressed = await compressImage(ev.target?.result as string);
-        onUpdateLogo(compressed);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSaveProduct = async () => {
     let finalSizes: (string | number)[] = [];
     if (addType === 'shoes') finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
@@ -140,64 +151,53 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     else finalSizes = ['Talla Única'];
 
     if (!newProduct.name || !newProduct.brand || !newProduct.price || !newProduct.images.front) {
-      return alert("⚠️ Faltan datos críticos.");
+      return alert("⚠️ Faltan datos críticos (Nombre, Marca, Precio y URL Imagen Principal).");
     }
 
-    const productId = `spicy-${Date.now()}`;
+    const productId = editingProductId || `spicy-${Date.now()}`;
     const productToSave: Product = {
       id: productId, name: newProduct.name, brand: newProduct.brand, price: newProduct.price, description: newProduct.description, 
       category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), 
-      availableSizes: finalSizes, image: newProduct.images.front, images: { ...newProduct.images }, isSoldOut: false
+      availableSizes: finalSizes, 
+      image: newProduct.images.front, // Imagen principal mapeada desde front
+      images: { ...newProduct.images }, 
+      isSoldOut: false
     };
 
-    // UI BASADA EN ESTADOS REALES: Activamos el estado de sincronización
-    setUploading(prev => ({ ...prev, [productId]: true }));
-    setIsSaving(true); // Bloqueo preventivo en la pestaña de "Añadir" para evitar duplicados
-
+    setIsSaving(true);
     try {
-      // 1. Persistencia Real en Firebase (Atomic await)
       const confirmedProduct = await syncService.saveProduct(productToSave);
-
-      // 2. SOLO AQUÍ, DESPUÉS DE LA CONFIRMACIÓN DEL SERVIDOR, ACTUALIZAMOS LA UI
-      await onAddProduct(confirmedProduct);
-      
-      alert(`✅ ¡Confirmado por Firebase! "${confirmedProduct.name}" ya está en línea.`);
-
-      // 3. Limpieza de Formulario y Cambio de Pestaña
+      if (editingProductId) {
+        await onUpdateProduct(confirmedProduct);
+        alert(`✅ ¡Actualizado! "${confirmedProduct.name}" ha sido guardado.`);
+      } else {
+        await onAddProduct(confirmedProduct);
+        alert(`✅ ¡Publicado! "${confirmedProduct.name}" ya está disponible vía URL.`);
+      }
       setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
       setSizesText('');
       setSelectedSportwearSizes([]);
+      setEditingProductId(null);
       setActiveTab('inventory');
-
     } catch (error: any) {
-      // Manejo de Error Real: Sin animaciones engañosas
-      console.error("Fallo crítico de sincronización:", error);
-      alert(`❌ ERROR REAL: El producto NO se pudo subir.\nDetalle: ${error.message || "Fallo en Firebase Vault"}`);
+      alert(`❌ Error al guardar: ${error.message}`);
     } finally {
-      // Siempre limpiamos estados de carga
       setIsSaving(false);
-      setUploading(prev => {
-        const newState = { ...prev };
-        delete newState[productId];
-        return newState;
-      });
     }
   };
 
   const handleSaveNewBanner = async () => {
-    if (!newBannerData.name || !newBannerData.image) return alert("⚠️ Datos faltantes.");
+    if (!newBannerData.title || !newBannerData.image) return alert("⚠️ Datos faltantes (Título Blanco e Imagen).");
     setIsSaving(true);
     try {
-      const compressedImage = await compressImage(newBannerData.image);
       let sizes: (string | number)[] = [];
       if (showAddBannerForm.section === 'Calzado') sizes = [7, 8, 9, 10, 11, 12];
       else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
       else sizes = ['Talla Única'];
-      const marqueeUrl = await syncService.uploadBannerImage(compressedImage, newBannerData.name);
-      const common = { name: newBannerData.name, marqueeImage: marqueeUrl, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
-      if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: newBannerData.name[0] });
-      else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: newBannerData.name[0] });
-      else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: marqueeUrl });
+      const common = { name: newBannerData.name || newBannerData.title, marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
+      if (showAddBannerForm.section === 'Calzado') onAddTennisBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
+      else if (showAddBannerForm.section === 'Medias') onAddSocksBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
+      else if (showAddBannerForm.section === 'Sportwear') onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: newBannerData.image });
       setShowAddBannerForm({section: null}); 
       setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
     } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
@@ -207,9 +207,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     if (!editingBanner) return;
     setIsSaving(true);
     try {
-      const compressed = await compressImage(editingBanner.data.marqueeImage || editingBanner.data.image);
-      const marqueeUrl = await syncService.uploadBannerImage(compressed, editingBanner.data.name);
-      const updatedData = { ...editingBanner.data, marqueeImage: marqueeUrl, image: marqueeUrl };
+      const updatedData = { ...editingBanner.data, marqueeImage: editingBanner.data.marqueeImage, image: editingBanner.data.image };
       if (editingBanner.type === 'tennis') onUpdateTennisBrand(updatedData);
       else if (editingBanner.type === 'socks') onUpdateSocksBrand(updatedData);
       else if (editingBanner.type === 'sportwear') onUpdateCategory(updatedData);
@@ -218,48 +216,36 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
   };
 
-  const migrateHistoricalData = async () => {
-    setIsMigrating(true);
-    try {
-      const oldData = await import('../old_constants_migrate');
-      if (oldData.TENNIS_BRANDS) for (const b of oldData.TENNIS_BRANDS) { const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_tennis_${b.name}`); onAddTennisBrand({ ...b, marqueeImage: url }); }
-      if (oldData.SOCKS_BRANDS) for (const b of oldData.SOCKS_BRANDS) { const url = await syncService.uploadBannerImage(b.marqueeImage, `banner_socks_${b.name}`); onAddSocksBrand({ ...b, marqueeImage: url }); }
-      if (oldData.SPORTWEAR_CATEGORIES) for (const c of oldData.SPORTWEAR_CATEGORIES) { const url = await syncService.uploadBannerImage(c.image, `banner_sport_${c.name}`); onAddCategory({ ...c, image: url }); }
-      if (oldData.PRODUCTS) for (const p of oldData.PRODUCTS) { await syncService.saveProduct(p); }
-      alert("✅ Migración Completa."); if (onLoadTestData) await onLoadTestData();
-    } catch (e: any) { alert(`❌ Error: ${e.message}`); } finally { setIsMigrating(false); }
-  };
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 md:p-10">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 md:p-6 lg:p-10">
       <div className="absolute inset-0 bg-black/95 backdrop-blur-md" onClick={onClose}></div>
-      <div className="relative w-full h-full md:max-w-6xl md:h-[95vh] bg-zinc-950 md:rounded-[3rem] border border-white/10 flex flex-col overflow-hidden shadow-2xl text-white">
+      <div className="relative w-full h-full md:max-w-7xl md:h-[90vh] bg-zinc-950 md:rounded-[3rem] border-x-0 md:border border-white/10 flex flex-col overflow-hidden shadow-2xl text-white">
         
         {isSaving && (
           <div className="absolute inset-0 z-[200] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
-            <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-white font-black uppercase tracking-[0.3em] text-[10px]">Verificando con Firebase Vault...</p>
+            <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-white font-black uppercase tracking-[0.3em] text-[10px]">Guardando...</p>
           </div>
         )}
 
-        <div className="px-6 md:px-10 py-5 border-b border-white/5 bg-zinc-900/40 flex items-center justify-between shrink-0">
-          <div className="flex items-center space-x-6">
-            <h3 className="text-red-600 font-black italic text-xl md:text-2xl tracking-tighter">ADMIN_SPICY</h3>
+        <div className="sticky top-0 z-[160] px-4 md:px-10 py-5 border-b border-white/5 bg-zinc-900/80 backdrop-blur-xl flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-4 md:space-x-6 overflow-x-auto no-scrollbar">
+            <h3 className="text-red-600 font-black italic text-lg md:text-2xl tracking-tighter shrink-0">ADMIN_SPICY</h3>
             {isAuthorized && (
-              <div className="flex bg-black p-1 rounded-xl border border-white/5 overflow-x-auto no-scrollbar">
-                <button onClick={() => setActiveTab('inventory')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>📦 Stock</button>
-                <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'add' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>➕ Nuevo</button>
-                <button onClick={() => setActiveTab('banners')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>🖼️ Banners</button>
-                <button onClick={() => setActiveTab('config')} className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase whitespace-nowrap transition-all ${activeTab === 'config' ? 'bg-red-600 text-white' : 'text-zinc-500'}`}>⚙️ Ajustes</button>
+              <div className="flex bg-black/50 p-1 rounded-xl border border-white/5 whitespace-nowrap">
+                <button onClick={() => setActiveTab('inventory')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Stock</button>
+                <button onClick={() => setActiveTab('add')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'add' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>+ Nuevo</button>
+                <button onClick={() => setActiveTab('banners')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Banners</button>
+                <button onClick={() => setActiveTab('config')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'config' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>⚙️</button>
               </div>
             )}
           </div>
-          <button onClick={onClose} className="p-2 text-zinc-500 hover:text-white transition-colors"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2"/></svg></button>
+          <button onClick={onClose} className="p-3 bg-white/5 hover:bg-white/10 rounded-full transition-colors ml-4 focus:ring-2 focus:ring-red-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" strokeWidth="2.5"/></svg></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar overscroll-contain">
           {!isAuthorized ? (
             <div className="max-w-sm mx-auto py-24 space-y-6 text-center">
                <div className="text-red-600 font-black text-6xl italic mb-10">SP</div>
@@ -272,11 +258,16 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
           ) : activeTab === 'add' ? (
             <div className="max-w-6xl mx-auto space-y-12 pb-20 animate-fade-in">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
-                <h4 className="text-2xl font-black italic uppercase">Nueva Rúbrica de Producto</h4>
-                <div className="flex space-x-2 bg-black p-1 rounded-2xl border border-white/5">
-                  <button onClick={() => { setAddType('shoes'); setNewProduct(prev => ({...prev, category: 'Shoes'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'shoes' ? 'bg-white text-black' : 'text-zinc-500'}`}>👟 Calzado</button>
-                  <button onClick={() => { setAddType('sportwear'); setNewProduct(prev => ({...prev, category: 'Sportwear'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'sportwear' ? 'bg-white text-black' : 'text-zinc-500'}`}>🎽 Sportwear</button>
-                  <button onClick={() => { setAddType('socks'); setNewProduct(prev => ({...prev, category: 'Medias'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'socks' ? 'bg-white text-black' : 'text-zinc-500'}`}>🧦 Medias</button>
+                <h4 className="text-2xl font-black italic uppercase">{editingProductId ? 'Editando Rúbrica' : 'Nueva Rúbrica de Producto'} (Modo URL)</h4>
+                <div className="flex items-center gap-4">
+                  {editingProductId && (
+                    <button onClick={() => { setEditingProductId(null); setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }}); }} className="px-4 py-2 bg-zinc-800 text-[9px] font-black uppercase rounded-lg hover:bg-zinc-700">Cancelar Edición</button>
+                  )}
+                  <div className="flex space-x-2 bg-black p-1 rounded-2xl border border-white/5">
+                    <button onClick={() => { setAddType('shoes'); setNewProduct(prev => ({...prev, category: 'Shoes'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'shoes' ? 'bg-white text-black' : 'text-zinc-500'}`}>👟 Calzado</button>
+                    <button onClick={() => { setAddType('sportwear'); setNewProduct(prev => ({...prev, category: 'Sportwear'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'sportwear' ? 'bg-white text-black' : 'text-zinc-500'}`}>🎽 Sportwear</button>
+                    <button onClick={() => { setAddType('socks'); setNewProduct(prev => ({...prev, category: 'Medias'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'socks' ? 'bg-white text-black' : 'text-zinc-500'}`}>🧦 Medias</button>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
@@ -289,15 +280,39 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <input placeholder="Tallas (EJ: 7, 8.5, 10)" value={sizesText} onChange={e => setSizesText(e.target.value)} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
                   <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
                   <button onClick={handleSaveProduct} disabled={isSaving} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl disabled:opacity-50">
-                    {isSaving ? "SINCRONIZANDO..." : "PUBLICAR PRODUCTO"}
+                    {isSaving ? "SINCRONIZANDO..." : editingProductId ? "GUARDAR CAMBIOS" : "PUBLICAR PRODUCTO"}
                   </button>
                 </div>
                 <div className="space-y-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <p className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] mb-4">Captura de Imágenes (Upload Only)</p>
+                  <div className="grid grid-cols-2 gap-6">
                     {(addType === 'shoes' ? ['front', 'back', 'left', 'right', 'top', 'bottom'] : ['front', 'back']).map((slot) => (
-                      <div key={slot} className="aspect-square bg-zinc-900 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-red-600/40">
-                        {newProduct.images[slot as keyof ProductImages] ? ( <img src={newProduct.images[slot as keyof ProductImages]} className="w-full h-full object-cover" /> ) : ( <div className="absolute inset-0 flex items-center justify-center opacity-20"><svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="2"/></svg></div> )}
-                        <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, slot as keyof ProductImages)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                      <div key={slot} className="flex flex-col space-y-3 bg-black/40 p-5 rounded-3xl border border-white/5 group hover:border-red-600/30 transition-all">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[9px] font-[1000] uppercase text-zinc-500 tracking-widest">{slot}</label>
+                          {newProduct.images[slot as keyof ProductImages] && (
+                            <span className="text-[8px] font-black text-green-500 flex items-center gap-1 animate-pulse">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>
+                              LISTO
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <label className="flex-1 cursor-pointer group/btn overflow-hidden">
+                             <div className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 border-dashed transition-all ${newProduct.images[slot as keyof ProductImages] ? 'border-green-600/20 bg-green-600/5' : 'border-zinc-800 bg-zinc-900/50 hover:border-red-600/40 hover:bg-zinc-900'}`}>
+                               <svg className={`w-5 h-5 ${newProduct.images[slot as keyof ProductImages] ? 'text-green-500' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                               <span className="text-[10px] font-black uppercase text-white tracking-tighter">
+                                 {newProduct.images[slot as keyof ProductImages] ? "Cambiar" : "Subir Foto"}
+                               </span>
+                             </div>
+                             <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, slot)} accept="image/*" />
+                          </label>
+                          {newProduct.images[slot as keyof ProductImages] && (
+                            <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/10 shrink-0 shadow-2xl rotate-2 hover:rotate-0 transition-transform">
+                               <img src={newProduct.images[slot as keyof ProductImages]} className="w-full h-full object-cover" alt="Preview" />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -306,17 +321,25 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
             </div>
           ) : activeTab === 'banners' ? (
             <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">
-              <h4 className="text-3xl font-black italic uppercase text-white border-l-4 border-red-600 pl-6 tracking-tighter">Diseño & Banners</h4>
+              <h4 className="text-3xl font-black italic uppercase text-white border-l-4 border-red-600 pl-6 tracking-tighter">Diseño & Banners (Modo URL)</h4>
               {editingBanner && (
                 <div className="bg-zinc-900 p-8 rounded-[2rem] border border-red-600/50 space-y-6 animate-scale-in shadow-2xl">
                   <h5 className="text-lg font-black uppercase text-red-600 italic">Editar Banner: {editingBanner.data.name}</h5>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <input value={editingBanner.data.bannerTitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerTitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco" />
                     <input value={editingBanner.data.bannerSubtitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerSubtitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris" />
-                    <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/5">
-                       <img src={editingBanner.data.marqueeImage || editingBanner.data.image} className="w-full h-full object-cover" />
-                       <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload = (ev) => setEditingBanner({...editingBanner, data: {...editingBanner.data, marqueeImage: ev.target?.result as string, image: ev.target?.result as string}}); r.readAsDataURL(f); }}} />
+                    <div className="flex items-center space-x-4">
+                        <div className="flex-1 bg-black border border-white/5 p-4 rounded-xl text-[10px] font-bold text-zinc-500 italic">
+                            {editingBanner.data.marqueeImage || editingBanner.data.image ? "✅ Imagen cargada" : "Selecciona nueva imagen"}
+                        </div>
+                        <label className="cursor-pointer bg-red-600 p-4 rounded-xl hover:bg-red-700 transition-all shadow-lg active:scale-95">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'marqueeImage', 'banner')} accept="image/*" />
+                        </label>
                     </div>
+                    {(editingBanner.data.marqueeImage || editingBanner.data.image) && (
+                      <img src={editingBanner.data.marqueeImage || editingBanner.data.image} className="aspect-video w-full object-cover rounded-xl" />
+                    )}
                   </div>
                   <div className="flex space-x-3">
                     <button onClick={handleSaveEditBanner} disabled={isSaving} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-red-700">Actualizar</button>
@@ -334,14 +357,20 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     </div>
                     {showAddBannerForm.section === section && (
                       <div className="bg-black p-8 rounded-[2rem] border border-red-600/30 animate-scale-in space-y-6 shadow-2xl">
-                         <div className="grid grid-cols-2 gap-4">
+                         <div className="grid grid-cols-1 gap-4">
                             <input value={newBannerData.name} onChange={e => setNewBannerData({...newBannerData, name: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold" placeholder="Nombre (Nike...)" />
-                            <input value={newBannerData.title} onChange={e => setNewBannerData({...newBannerData, title: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco" />
-                            <input value={newBannerData.subtitle} onChange={e => setNewBannerData({...newBannerData, subtitle: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris" />
-                            <div className="relative aspect-video bg-zinc-900 rounded-xl overflow-hidden border border-white/5">
-                               {newBannerData.image ? <img src={newBannerData.image} className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-zinc-600 absolute inset-0 flex items-center justify-center">SUBIR IMAGEN</span>}
-                               <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => { const f = e.target.files?.[0]; if(f){ const r = new FileReader(); r.onload = (ev) => setNewBannerData({...newBannerData, image: ev.target?.result as string}); r.readAsDataURL(f); }}} />
+                            <input value={newBannerData.title} onChange={e => setNewBannerData({...newBannerData, title: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco (Obligatorio)" />
+                            <input value={newBannerData.subtitle} onChange={e => setNewBannerData({...newBannerData, subtitle: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris (Opcional)" />
+                            <div className="flex items-center space-x-4">
+                                <div className="flex-1 bg-zinc-900 border border-white/5 p-4 rounded-xl text-[10px] font-bold text-zinc-500 italic">
+                                    {newBannerData.image ? "✅ Imagen lista" : "Subir imagen del banner"}
+                                </div>
+                                <label className="cursor-pointer bg-red-600 p-4 rounded-xl hover:bg-red-700 transition-all shadow-lg active:scale-95">
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'image', 'banner')} accept="image/*" />
+                                </label>
                             </div>
+                            {newBannerData.image && <img src={newBannerData.image} className="aspect-video w-full object-cover rounded-xl shadow-2xl border border-white/10" />}
                          </div>
                          <div className="flex space-x-3">
                             <button onClick={handleSaveNewBanner} disabled={isSaving} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-red-700">Guardar Banner</button>
@@ -349,15 +378,15 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                          </div>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                       {list.map((item: any, idx) => (
-                        <div key={idx} className="bg-black/60 p-5 rounded-3xl border border-white/5 group relative hover:border-red-600/40 transition-all">
+                        <div key={idx} className="bg-black/60 p-4 md:p-5 rounded-3xl border border-white/5 group relative hover:border-red-600/40 transition-all">
                           <div className="absolute top-4 right-4 flex space-x-2 z-20">
-                            <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
-                            <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Borrar permanentemente?')) { if(section === 'Calzado') onDeleteTennisBrand(item.name); else if(section === 'Medias') onDeleteSocksBrand(item.name); else onDeleteCategory(item.name); } }} className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                            <button onClick={() => setEditingBanner({type: section === 'Calzado' ? 'tennis' : section === 'Medias' ? 'socks' : 'sportwear', data: item})} className="p-3 bg-blue-600/90 hover:bg-blue-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all"><svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg></button>
+                            <button onClick={(e) => { e.stopPropagation(); if(confirm('¿Borrar permanentemente?')) { if(section === 'Calzado') onDeleteTennisBrand(item.name); else if(section === 'Medias') onDeleteSocksBrand(item.name); else onDeleteCategory(item.name); } }} className="p-3 bg-red-600/90 hover:bg-red-600 text-white rounded-xl shadow-xl backdrop-blur-sm active:scale-95 transition-all"><svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                           </div>
                           <div className="aspect-video rounded-2xl overflow-hidden border border-white/5 mb-4 relative">
-                            <img src={item.marqueeImage || item.image} className="w-full h-full object-cover transition-all duration-500" />
+                            <img src={item.marqueeImage || item.image} className="w-full h-full object-cover" alt={item.name} />
                           </div>
                           <p className="text-[10px] font-black uppercase text-white truncate">{item.bannerTitle || item.name}</p>
                           <p className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest truncate">{item.bannerSubtitle || 'SIN SUBTÍTULO'}</p>
@@ -373,18 +402,21 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
               <h4 className="text-3xl font-black italic uppercase text-white border-l-4 border-red-600 pl-6 tracking-tighter">Ajustes del Sistema</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 bg-zinc-900/30 p-10 rounded-[3rem] border border-white/5">
                 <div className="space-y-6 text-center md:text-left">
-                  <label className="text-[11px] font-[1000] text-zinc-500 uppercase tracking-[0.3em] block">Identidad Visual (Logo)</label>
+                  <label className="text-[11px] font-[1000] text-zinc-500 uppercase tracking-[0.3em] block">Identidad Visual (Cloudinary)</label>
+                  <div className="flex items-center space-x-4">
+                    <input value={logo || ''} onChange={(e) => onUpdateLogo(e.target.value)} placeholder="URL del Logo..." className="flex-1 bg-black border border-white/10 p-5 rounded-2xl text-xs font-bold text-white" />
+                    <label className="cursor-pointer bg-red-600 p-5 rounded-2xl hover:bg-red-700 transition-all shadow-lg active:scale-95">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'logo', 'logo')} accept="image/*" />
+                    </label>
+                  </div>
                   <div className="aspect-square w-48 bg-black rounded-[2.5rem] border border-white/10 flex items-center justify-center relative overflow-hidden group shadow-2xl mx-auto md:mx-0">
                     {logo ? <img src={logo} className="w-full h-full object-contain p-6" /> : <div className="text-red-600 font-black text-5xl italic">SP</div>}
-                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
                   </div>
                 </div>
                 <div className="space-y-6">
                   <label className="text-[11px] font-[1000] text-zinc-500 uppercase tracking-[0.3em] block">Soporte WhatsApp</label>
                   <textarea value={whatsappTemplate} onChange={(e) => onUpdateWhatsAppTemplate(e.target.value)} className="w-full bg-black border border-white/10 p-6 rounded-3xl text-xs font-bold h-44 resize-none" />
-                  <button onClick={migrateHistoricalData} disabled={isMigrating} className="w-full mt-4 py-4 bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all disabled:opacity-50">
-                    {isMigrating ? "Migrando Banners..." : "⚡ Migrar Banners Históricos (GitHub)"}
-                  </button>
                   <button onClick={onClearBanners} className="w-full mt-2 py-4 bg-red-600/20 border border-red-500/30 text-red-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">
                     🗑️ Borrar Todos los Banners
                   </button>
@@ -392,29 +424,26 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
               </div>
             </div>
           ) : (
-            <div className="space-y-12 max-w-5xl mx-auto pb-20 animate-fade-in">
-               <h2 className="text-4xl font-black italic uppercase tracking-tighter border-l-4 border-red-600 pl-4">Stock de Productos</h2>
+            <div className="space-y-8 max-w-5xl mx-auto pb-20 animate-fade-in px-2 md:px-0">
+               <h2 className="text-3xl md:text-4xl font-black italic uppercase tracking-tighter border-l-4 border-red-600 pl-4">Stock</h2>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {products.map(p => (
-                   <div key={p.id} className="bg-zinc-900/50 p-4 rounded-[2rem] flex items-center justify-between border border-white/5 group hover:border-white/10 transition-all relative overflow-hidden">
-                     
-                     {uploading[p.id] && (
-                       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-10 flex items-center justify-center space-x-3">
-                         <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-                         <span className="text-[8px] font-black uppercase tracking-widest">Sincronizando...</span>
-                       </div>
-                     )}
-
-                     <div className="flex items-center space-x-5">
-                       <div className="w-16 h-16 bg-black rounded-2xl border border-white/5 overflow-hidden"> <img src={p.image} className="w-full h-full object-cover" /> </div>
+                   <div key={p.id} className="bg-zinc-900/50 p-4 rounded-[2rem] flex flex-row items-center justify-between border border-white/5 group hover:border-white/10 transition-all relative overflow-x-auto no-scrollbar whitespace-nowrap snap-x">
+                     <div className="flex items-center space-x-4 min-w-max pr-8 snap-start">
+                       <div className="w-14 h-14 md:w-16 md:h-16 bg-black rounded-2xl border border-white/5 overflow-hidden shrink-0"> <img src={p.image} className="w-full h-full object-cover" alt={p.name} /> </div>
                        <div>
-                         <p className="text-[10px] font-black uppercase text-white leading-tight">{p.name}</p>
-                         <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.2em]">{p.brand} ● RD${p.price}</p>
+                         <p className="text-[10px] md:text-xs font-black uppercase text-white leading-tight block">{p.name}</p>
+                         <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-[0.1em]">RD${p.price.toLocaleString()}</p>
                        </div>
                      </div>
-                     <div className="flex items-center space-x-2">
-                       <button onClick={() => onToggleStock(p.id)} className={`px-4 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${p.isSoldOut ? 'bg-zinc-800 text-zinc-600' : 'bg-green-600/10 text-green-500 border border-green-500/20 shadow-lg'}`}>{p.isSoldOut ? 'SOLD OUT' : 'READY'}</button>
-                       <button onClick={() => onDeleteProduct(p.id)} className="p-3 text-zinc-700 hover:text-red-600 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
+                     <div className="flex items-center space-x-2 shrink-0 ml-auto bg-zinc-900/80 backdrop-blur-md pl-4 py-1 rounded-2xl snap-end">
+                       <button onClick={() => handleEditProductClick(p)} className="p-3 text-zinc-500 hover:text-blue-500 transition-colors active:scale-90 flex-shrink-0">
+                         <svg className="w-6 h-6 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.036 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/>
+                         </svg>
+                       </button>
+                       <button onClick={() => onToggleStock(p.id)} className={`px-4 py-3 rounded-xl text-[9px] font-black uppercase transition-all active:scale-95 flex-shrink-0 ${p.isSoldOut ? 'bg-zinc-800 text-zinc-600' : 'bg-green-600/10 text-green-500 border border-green-500/20 shadow-lg'}`}>{p.isSoldOut ? 'SOLD' : 'READY'}</button>
+                       <button onClick={() => onDeleteProduct(p.id)} className="p-3 text-zinc-500 hover:text-red-600 transition-colors active:scale-90 flex-shrink-0"><svg className="w-6 h-6 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2.5"/></svg></button>
                      </div>
                    </div>
                  ))}

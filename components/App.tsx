@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../constants';
 import { Product, CartItem, BrandStock, FilterState, SportwearCategory } from '../types';
-import { syncService, GlobalState } from '../services/syncService';
+import { syncService, GlobalState, db } from '../services/syncService';
+import { collection, onSnapshot } from 'firebase/firestore';
 import Header from './Header';
+// ... rest of imports
 import Hero from './Hero';
 import Sportwear from './Sportwear';
 import Socks from './Socks';
@@ -81,6 +83,31 @@ const App: React.FC = () => {
     loadUniversalState();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "banners"), (snapshot) => {
+      const banners: any[] = [];
+      snapshot.forEach((doc) => {
+        banners.push({ id: doc.id, ...doc.data() });
+      });
+      
+      const tBrands = banners.filter(b => b.type === 'tennis');
+      const sBrands = banners.filter(b => b.type === 'socks');
+      const cats = banners.filter(b => b.type === 'sportwear');
+
+      if (tBrands.length > 0 || banners.length > 0) {
+        setTennisBrands(tBrands.length > 0 ? tBrands : TENNIS_BRANDS);
+        setSocksBrands(sBrands.length > 0 ? sBrands : SOCKS_BRANDS);
+        setCurrentCategories(cats.length > 0 ? cats : SPORTWEAR_CATEGORIES);
+        
+        if (tBrands.length > 0 && !activeBrand) {
+           setActiveBrand(tBrands[0]);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [activeBrand]);
+
   const publishState = useCallback(async (updates: Partial<GlobalState>) => {
     setIsPublishing(true);
     try {
@@ -102,6 +129,50 @@ const App: React.FC = () => {
       setIsPublishing(false);
     }
   }, [currentProducts, currentCategories, tennisBrands, socksBrands, customLogo, whatsappTemplate]);
+
+  const handleAddBanner = async (banner: any, type: 'tennis' | 'socks' | 'sportwear') => {
+    setIsPublishing(true);
+    try {
+      const id = await syncService.saveBanner({ ...banner, type });
+      const newBanner = { ...banner, id, type };
+      if (type === 'tennis') setTennisBrands(prev => [...prev, newBanner]);
+      else if (type === 'socks') setSocksBrands(prev => [...prev, newBanner]);
+      else if (type === 'sportwear') setCurrentCategories(prev => [...prev, newBanner]);
+    } catch (e) {
+      console.error("Error adding banner:", e);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleUpdateBanner = async (banner: any, type: 'tennis' | 'socks' | 'sportwear') => {
+    if (!banner.id) return;
+    setIsPublishing(true);
+    try {
+      await syncService.updateBanner(banner.id, banner);
+      if (type === 'tennis') setTennisBrands(prev => prev.map(b => b.id === banner.id ? banner : b));
+      else if (type === 'socks') setSocksBrands(prev => prev.map(b => b.id === banner.id ? banner : b));
+      else if (type === 'sportwear') setCurrentCategories(prev => prev.map(c => c.id === banner.id ? banner : c));
+    } catch (e) {
+      console.error("Error updating banner:", e);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleDeleteBanner = async (id: string, type: 'tennis' | 'socks' | 'sportwear') => {
+    setIsPublishing(true);
+    try {
+      await syncService.deleteBanner(id);
+      if (type === 'tennis') setTennisBrands(prev => prev.filter(b => b.id !== id));
+      else if (type === 'socks') setSocksBrands(prev => prev.filter(b => b.id !== id));
+      else if (type === 'sportwear') setCurrentCategories(prev => prev.filter(c => c.id !== id));
+    } catch (e) {
+      console.error("Error deleting banner:", e);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   const filteredProducts = useMemo(() => {
     return currentProducts.filter(p => {
@@ -154,7 +225,7 @@ const App: React.FC = () => {
         <Sportwear categories={currentCategories} products={currentProducts} onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} />
         <Socks brands={socksBrands} products={currentProducts} onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} />
         
-        <section id="product-grid" className="px-6 md:px-20 py-24 scroll-mt-24">
+        <section id="product-grid" className="px-4 md:px-20 py-24 scroll-mt-24">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
             <h2 className="text-4xl md:text-7xl font-[1000] italic uppercase tracking-tighter leading-none">{filters.category || filters.brand || 'Explorar Todo'}</h2>
             {(filters.brand || filters.size || filters.category) && <button onClick={() => setFilters({brand: null, size: null, category: null})} className="text-[10px] font-black uppercase text-zinc-500 hover:text-white border-b border-zinc-800">Limpiar Filtros</button>}
@@ -183,13 +254,16 @@ const App: React.FC = () => {
           await publishState({ products: updated });
         }}
         onDeleteProduct={async id => { 
-          if(confirm('¿Seguro?')) {
+          if(confirm('¿Seguro que deseas eliminar este producto?')) {
             try {
               await syncService.deleteProduct(id);
               const updated = currentProducts.filter(p => p.id !== id);
               setCurrentProducts(updated);
               await publishState({ products: updated });
-            } catch (e) { alert("Error al borrar."); }
+            } catch (e: any) { 
+              console.error("❌ Error al eliminar producto:", e);
+              alert(`🚨 ERROR AL BORRAR:\n\n${e.message || 'Error desconocido'}`); 
+            }
           }
         }}
         onToggleStock={async (id) => { 
@@ -204,15 +278,24 @@ const App: React.FC = () => {
             } catch (e) { setCurrentProducts(currentProducts); }
           }
         }}
-        onAddTennisBrand={nb => { const updated = [...tennisBrands, nb]; setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
-        onDeleteTennisBrand={name => { const updated = tennisBrands.filter(b => b.name !== name); setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
-        onUpdateTennisBrand={ub => { const updated = tennisBrands.map(b => b.name === ub.name ? ub : b); setTennisBrands(updated); publishState({ tennisBrands: updated }); }}
-        onAddSocksBrand={nb => { const updated = [...socksBrands, nb]; setSocksBrands(updated); publishState({ socksBrands: updated }); }}
-        onDeleteSocksBrand={name => { const updated = socksBrands.filter(b => b.name !== name); setSocksBrands(updated); publishState({ socksBrands: updated }); }}
-        onUpdateSocksBrand={ub => { const updated = socksBrands.map(b => b.name === ub.name ? ub : b); setSocksBrands(updated); publishState({ socksBrands: updated }); }}
-        onAddCategory={nc => { const updated = [...currentCategories, nc]; setCurrentCategories(updated); publishState({ categories: updated }); }}
-        onDeleteCategory={name => { const updated = currentCategories.filter(c => c.name !== name); setCurrentCategories(updated); publishState({ categories: updated }); }}
-        onUpdateCategory={uc => { const updated = currentCategories.map(c => c.name === uc.name ? uc : c); setCurrentCategories(updated); publishState({ categories: updated }); }}
+        onAddTennisBrand={nb => handleAddBanner(nb, 'tennis')}
+        onDeleteTennisBrand={name => {
+          const banner = tennisBrands.find(b => b.name === name);
+          if (banner?.id) handleDeleteBanner(banner.id, 'tennis');
+        }}
+        onUpdateTennisBrand={ub => handleUpdateBanner(ub, 'tennis')}
+        onAddSocksBrand={nb => handleAddBanner(nb, 'socks')}
+        onDeleteSocksBrand={name => {
+          const banner = socksBrands.find(b => b.name === name);
+          if (banner?.id) handleDeleteBanner(banner.id, 'socks');
+        }}
+        onUpdateSocksBrand={ub => handleUpdateBanner(ub, 'socks')}
+        onAddCategory={nc => handleAddBanner(nc, 'sportwear')}
+        onDeleteCategory={name => {
+          const category = currentCategories.find(c => c.name === name);
+          if (category?.id) handleDeleteBanner(category.id, 'sportwear');
+        }}
+        onUpdateCategory={uc => handleUpdateBanner(uc, 'sportwear')}
         onReorderTennis={(s, t) => { const list = [...tennisBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setTennisBrands(list); publishState({ tennisBrands: list }); }}
         onReorderSocks={(s, t) => { const list = [...socksBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setSocksBrands(list); publishState({ socksBrands: list }); }}
         onReorderCategory={(s, t) => { const list = [...currentCategories]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setCurrentCategories(list); publishState({ categories: list }); }}
@@ -242,6 +325,9 @@ const App: React.FC = () => {
         }}
         onClearBanners={async () => {
           if(confirm("¿Borrar banners?")) {
+            for (const b of tennisBrands) if(b.id) await syncService.deleteBanner(b.id);
+            for (const b of socksBrands) if(b.id) await syncService.deleteBanner(b.id);
+            for (const c of currentCategories) if(c.id) await syncService.deleteBanner(c.id);
             setTennisBrands([]); setSocksBrands([]); setCurrentCategories([]);
             await publishState({ tennisBrands: [], socksBrands: [], categories: [] });
           }

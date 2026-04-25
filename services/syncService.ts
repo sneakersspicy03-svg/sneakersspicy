@@ -1,11 +1,10 @@
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc } from "firebase/firestore";
-import { getStorage, ref, getDownloadURL, uploadBytes } from "firebase/storage";
+import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc, addDoc } from "firebase/firestore";
 import { Product, SportwearCategory, BrandStock } from '../types';
 
 const firebaseConfig = { 
-  apiKey: "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I", 
+  apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I", 
   authDomain: "sneakers-spicy-db.firebaseapp.com", 
   projectId: "sneakers-spicy-db", 
   storageBucket: "sneakers-spicy-db.firebasestorage.app", 
@@ -15,8 +14,37 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
+export const db = getFirestore(app);
+
+// CLOUDINARY CONFIG
+const CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME;
+const API_KEY = (import.meta as any).env?.VITE_CLOUDINARY_API_KEY;
+const API_SECRET = (import.meta as any).env?.VITE_CLOUDINARY_API_SECRET;
+
+// Helper robusto para extraer public_id de la URL de Cloudinary
+const extractPublicId = (url: string): string | null => {
+  try {
+    if (!url || !url.includes('cloudinary.com')) return null;
+    
+    const parts = url.split('/');
+    const uploadIndex = parts.indexOf('upload');
+    if (uploadIndex === -1) return null;
+
+    // Saltamos 'upload/' y posibles transformaciones
+    const afterUpload = parts.slice(uploadIndex + 1);
+    
+    // Filtramos transformaciones (ej: w_500) y versiones (ej: v1234567)
+    const publicIdParts = afterUpload.filter(part => {
+      const isTransformation = part.includes('_') && part.length < 20;
+      const isVersion = /^v\d+$/.test(part);
+      return !isTransformation && !isVersion;
+    });
+
+    return publicIdParts.join('/').split('.')[0];
+  } catch (e) {
+    return null;
+  }
+};
 
 export interface GlobalState {
   products: Product[];
@@ -29,66 +57,80 @@ export interface GlobalState {
 }
 
 export const syncService = {
-  // SUBIDA ATÓMICA DE IMÁGENES
-  uploadImage: async (base64Data: string, fileName: string): Promise<string> => {
-    if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
-    
-    // Sin catch interno: dejamos que el error suba al componente
-    const storageRef = ref(storage, `products/${fileName}`);
-    const response = await fetch(base64Data);
-    const blob = await response.blob();
-    const metadata = { contentType: 'image/jpeg' }; 
+  // SUBIDA A CLOUDINARY (REEMPLAZA FIREBASE STORAGE)
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', 'ml_default'); 
+    formData.append('cloud_name', CLOUD_NAME);
 
-    const snapshot = await uploadBytes(storageRef, blob, metadata);
-    return await getDownloadURL(snapshot.ref);
+    try {
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+      if (data.secure_url) {
+        return data.secure_url;
+      } else {
+        throw new Error(data.error?.message || 'Error desconocido en Cloudinary');
+      }
+    } catch (error) {
+      console.error('❌ Cloudinary Upload Error:', error);
+      throw error;
+    }
   },
 
-  // PERSISTENCIA TOTAL: Retorna confirmación o lanza error
-  saveProduct: async (product: Product): Promise<Product> => {
-    console.log(`📡 SRE: Iniciando persistencia atómica para: ${product.name}`);
-    let mainImageUrl = product.image;
-    
-    // 1. Storage: Imagen Principal
-    if (mainImageUrl.startsWith('data:image/')) {
-      mainImageUrl = await syncService.uploadImage(mainImageUrl, `${product.id}_main_${Date.now()}`);
-    }
-    
-    // 2. Storage: Galería
-    const updatedImages: any = {};
-    if (product.images) {
-      for (const [key, val] of Object.entries(product.images)) {
-        if (typeof val === 'string' && val.startsWith('data:image/')) {
-          updatedImages[key] = await syncService.uploadImage(val, `${product.id}_${key}_${Date.now()}`);
-        } else {
-          updatedImages[key] = val;
-        }
-      }
+  // BORRADO DE CLOUDINARY
+  deleteFromCloudinary: async (urls: string | string[]): Promise<void> => {
+    if (!API_SECRET) {
+      throw new Error("❌ Error: API Secret no cargada. Contacta al administrador.");
     }
 
+    const urlList = Array.isArray(urls) ? urls : [urls];
+    const validUrls = urlList.filter(u => u && u.includes('cloudinary.com'));
+
+    if (validUrls.length === 0) return;
+
+    for (const url of validUrls) {
+      const publicId = extractPublicId(url);
+      if (!publicId) continue;
+
+      try {
+        const timestamp = Math.round(new Date().getTime() / 1000);
+        const formData = new FormData();
+        formData.append('public_id', publicId);
+        formData.append('api_key', API_KEY);
+        formData.append('timestamp', timestamp.toString());
+        
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/destroy`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.result !== 'ok' && result.result !== 'not found') {
+          throw new Error(`Cloudinary API Error: ${result.result || 'Desconocido'}`);
+        }
+      } catch (error: any) {
+        console.error(`❌ Error borrando recurso ${publicId}:`, error);
+        throw error;
+      }
+    }
+  },
+
+  // PERSISTENCIA EN FIRESTORE
+  saveProduct: async (product: Product): Promise<Product> => {
     const finalProduct = { 
       ...product, 
-      image: mainImageUrl, 
-      images: updatedImages,
       lastUpdated: Date.now() 
     };
 
-    // 3. Firestore: Confirmación de Escritura
     const docRef = doc(db, "productos", product.id);
     await setDoc(docRef, finalProduct);
-    
-    console.log(`✅ SRE: Confirmación real recibida de Firebase para ${product.id}`);
     return finalProduct;
-  },
-
-  uploadBannerImage: async (base64Data: string, bannerName: string): Promise<string> => {
-    if (!base64Data || !base64Data.startsWith('data:image/')) return base64Data;
-    const storageRef = ref(storage, `banners/${bannerName.replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`);
-    const response = await fetch(base64Data);
-    const blob = await response.blob();
-    const metadata = { contentType: 'image/jpeg' };
-    
-    const snapshot = await uploadBytes(storageRef, blob, metadata);
-    return await getDownloadURL(snapshot.ref);
   },
 
   toggleStock: async (id: string, isSoldOut: boolean): Promise<void> => {
@@ -100,6 +142,36 @@ export const syncService = {
     await deleteDoc(doc(db, "productos", id));
   },
 
+  // BANNERS CRUD
+  saveBanner: async (banner: any): Promise<string> => {
+    const docRef = await addDoc(collection(db, "banners"), {
+      ...banner,
+      lastUpdated: Date.now()
+    });
+    return docRef.id;
+  },
+
+  updateBanner: async (id: string, banner: any): Promise<void> => {
+    const docRef = doc(db, "banners", id);
+    await updateDoc(docRef, { ...banner, lastUpdated: Date.now() });
+  },
+
+  deleteBanner: async (id: string): Promise<void> => {
+    await deleteDoc(doc(db, "banners", id));
+  },
+
+  getBanners: async (): Promise<any[]> => {
+    try {
+      const snap = await getDocs(collection(db, "banners"));
+      const banners: any[] = [];
+      snap.forEach(doc => banners.push({ id: doc.id, ...doc.data() }));
+      return banners;
+    } catch (e) {
+      console.error("Error fetching banners:", e);
+      return [];
+    }
+  },
+
   fetchState: async (): Promise<GlobalState | null> => {
     try {
       const configRef = doc(db, "config", "global_state");
@@ -108,17 +180,29 @@ export const syncService = {
       const productsList: Product[] = [];
       productsSnap.forEach(doc => productsList.push(doc.data() as Product));
 
+      // Fetch banners
+      const bannersList = await syncService.getBanners();
+
       if (configSnap.exists()) {
         const configData = configSnap.data();
         return {
           ...configData,
           products: productsList,
+          tennisBrands: bannersList.filter(b => b.type === 'tennis'),
+          socksBrands: bannersList.filter(b => b.type === 'socks'),
+          categories: bannersList.filter(b => b.type === 'sportwear'),
           lastUpdated: configData.lastUpdated || Date.now()
         } as GlobalState;
       }
-      return productsList.length > 0 ? { products: productsList, categories: [], tennisBrands: [], socksBrands: [], logo: null, lastUpdated: Date.now() } : null;
+      return { 
+        products: productsList, 
+        categories: bannersList.filter(b => b.type === 'sportwear'), 
+        tennisBrands: bannersList.filter(b => b.type === 'tennis'), 
+        socksBrands: bannersList.filter(b => b.type === 'socks'), 
+        logo: null, 
+        lastUpdated: Date.now() 
+      };
     } catch (error) {
-      console.error('Firebase Fetch Error:', error);
       return null;
     }
   },
@@ -126,11 +210,10 @@ export const syncService = {
   pushState: async (state: GlobalState): Promise<boolean> => {
     try {
       const docRef = doc(db, "config", "global_state");
-      const { products, ...restOfState } = state;
+      const { products, categories, tennisBrands, socksBrands, ...restOfState } = state;
       await setDoc(docRef, { ...restOfState, lastUpdated: Date.now() });
       return true;
     } catch (error) {
-      console.error('Firebase Push Error:', error);
       return false;
     }
   }
