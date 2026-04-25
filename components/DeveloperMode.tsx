@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock } from '../types';
-import { doc, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, collection, onSnapshot } from 'firebase/firestore';
 import { syncService, db } from '../services/syncService';
 
 interface DeveloperModeProps {
@@ -72,6 +72,16 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [dbBrands, setDbBrands] = useState<string[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'banners'), (snapshot) => {
+      const names = snapshot.docs.map(doc => doc.data().name as string);
+      setDbBrands(Array.from(new Set(names)).filter(Boolean).sort());
+    });
+    return () => unsubscribe();
+  }, []);
+
   const [isMigrating, setIsMigrating] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
@@ -313,9 +323,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                       onChange={e => setNewProduct({...newProduct, brand: e.target.value})} 
                       className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold text-white appearance-none cursor-pointer hover:border-red-600/50 transition-colors"
                     >
-                      <option value="" disabled>Seleccionar Marca</option>
-                      {[...tennisBrands, ...socksBrands, ...categories].map((b, idx) => (
-                        <option key={idx} value={b.name}>{b.name}</option>
+                      <option value="" disabled>Selecciona una marca</option>
+                      {dbBrands.map((brandName, idx) => (
+                        <option key={idx} value={brandName}>{brandName}</option>
                       ))}
                     </select>
                   </div>

@@ -59,9 +59,9 @@ const Header: React.FC<HeaderProps> = ({
           <>
             <button 
               onClick={onOpenDev} 
-              className="px-5 py-2.5 rounded-xl border-2 border-white/10 text-zinc-500 hover:border-white hover:text-white transition-all font-black text-[10px] tracking-widest uppercase"
+              className="px-5 py-2.5 rounded-xl border-2 border-white/10 bg-zinc-900 text-white hover:bg-zinc-800 transition-all font-black text-[10px] tracking-widest uppercase"
             >
-              Panel Dev
+              VENTANA DEV
             </button>
             <button 
               onClick={onToggleDevMode} 
