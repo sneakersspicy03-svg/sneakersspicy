@@ -140,13 +140,13 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
             <h4 className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.4em]">Seleccionar Talla ({isSportwear ? 'Ropa' : 'US'})</h4>
             <div className="flex flex-wrap gap-3">
               {product.availableSizes.map(size => {
-                const isSoldOut = product.isSoldOut || (product.soldOutSizes && product.soldOutSizes.map(String).includes(String(size)));
+                const isSizeSoldOut = product.isSoldOut || (product.soldOutSizes && product.soldOutSizes.map(String).includes(String(size))) || (product.stock ?? 1) === 0;
                 return (
                   <button 
                     key={size}
-                    disabled={isSoldOut}
+                    disabled={isSizeSoldOut}
                     onClick={() => { setSelectedSize(size); setIsAdded(false); }}
-                    className={`min-w-[56px] h-14 px-4 flex items-center justify-center text-sm font-black border-2 rounded-2xl transition-all ${isSoldOut ? 'opacity-10 border-zinc-900 cursor-not-allowed line-through' : selectedSize === size ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-900/30 scale-105' : 'border-white/5 text-white hover:border-red-600 hover:text-red-500'}`}
+                    className={`min-w-[56px] h-14 px-4 flex items-center justify-center text-sm font-black border-2 rounded-2xl transition-all ${isSizeSoldOut ? 'opacity-10 border-zinc-900 cursor-not-allowed line-through' : selectedSize === size ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-900/30 scale-105' : 'border-white/5 text-white hover:border-red-600 hover:text-red-500'}`}
                   >
                     {size}
                   </button>

@@ -178,7 +178,14 @@ export const syncService = {
       const configSnap = await getDoc(configRef);
       const productsSnap = await getDocs(collection(db, "productos"));
       const productsList: Product[] = [];
-      productsSnap.forEach(doc => productsList.push(doc.data() as Product));
+      productsSnap.forEach(doc => {
+        const data = doc.data();
+        productsList.push({ 
+          ...data, 
+          id: doc.id,
+          stock: data.stock !== undefined ? data.stock : 1 
+        } as Product);
+      });
 
       // Fetch banners
       const bannersList = await syncService.getBanners();

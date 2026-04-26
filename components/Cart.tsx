@@ -20,7 +20,7 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
   const handleCheckout = () => {
     if (items.length === 0) return;
 
-    const soldOutItems = items.filter(item => (item.stock ?? 0) === 0);
+    const soldOutItems = items.filter(item => item.isSoldOut || (item.stock ?? 1) === 0);
     if (soldOutItems.length > 0) {
       alert(`⚠️ Tienes ${soldOutItems.length} producto(s) agotado(s) en tu bolsa. Por favor, elimínalos para proceder con el pedido.`);
       return;
@@ -91,14 +91,14 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
             </div>
           ) : (
             items.map((item) => {
-              const isSoldOut = (item.stock ?? 0) === 0;
-              const isMaxStock = item.quantity >= (item.stock ?? 0);
+              const isActuallySoldOut = item.isSoldOut || (item.stock ?? 1) === 0;
+              const isMaxStock = item.quantity >= (item.stock ?? 1);
 
               return (
-                <div key={`${item.id}-${item.selectedSize}`} className={`flex space-x-5 group animate-fade-in duration-300 relative ${isSoldOut ? 'grayscale opacity-50' : ''}`}>
+                <div key={`${item.id}-${item.selectedSize}`} className={`flex space-x-5 group animate-fade-in duration-300 relative ${isActuallySoldOut ? 'grayscale opacity-50 pointer-events-none' : ''}`}>
                   <div className="w-20 h-20 md:w-24 md:h-24 bg-zinc-900 rounded-2xl overflow-hidden flex-shrink-0 border border-white/5 relative">
                     <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                    {isSoldOut && (
+                    {isActuallySoldOut && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
                         <span className="text-[10px] font-black text-red-500 uppercase tracking-widest bg-black px-2 py-1 rounded border border-red-500/50">AGOTADO</span>
                       </div>
@@ -110,16 +110,16 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
                         <h4 className="font-bold text-[11px] leading-tight uppercase tracking-tight text-white mb-1">{item.name}</h4>
                         <p className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Talla: <span className="text-red-500">{item.selectedSize}</span></p>
                       </div>
-                      <button onClick={() => onRemove(item.id, item.selectedSize)} className="text-zinc-700 hover:text-red-600 transition-colors p-1 relative z-20">
+                      <button onClick={() => onRemove(item.id, item.selectedSize)} className="text-zinc-700 hover:text-red-600 transition-colors p-1 relative z-20 pointer-events-auto">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
                     
-                    <div className={`flex items-center justify-between ${isSoldOut ? 'pointer-events-none' : ''}`}>
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 bg-zinc-900 rounded-lg p-1 border border-white/5">
                         <button 
                           onClick={() => onUpdateQuantity(item.id, item.selectedSize, -1)}
-                          disabled={isSoldOut}
+                          disabled={isActuallySoldOut}
                           className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md text-zinc-400 transition-colors font-bold disabled:opacity-20"
                         >
                           -
@@ -127,7 +127,7 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
                         <span className="text-xs font-black text-white w-5 text-center">{item.quantity}</span>
                         <button 
                           onClick={() => onUpdateQuantity(item.id, item.selectedSize, 1)}
-                          disabled={isSoldOut || isMaxStock}
+                          disabled={isActuallySoldOut || isMaxStock}
                           className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md text-zinc-400 transition-colors font-bold disabled:opacity-20"
                         >
                           +
