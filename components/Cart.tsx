@@ -21,17 +21,15 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
   const handleCheckout = () => {
     if (items.length === 0) return;
 
-    // Sincronización en vivo antes de proceder
-    const soldOutItems = items.filter(item => {
+    // Sincronización en vivo antes de proceder (Bloqueo si no existe o está agotado)
+    const invalidItems = items.filter(item => {
       const liveProduct = allProducts.find(p => p.id === item.id);
-      if (liveProduct) {
-        return liveProduct.isSoldOut || (liveProduct.stock ?? 1) === 0;
-      }
-      return item.isSoldOut || (item.stock ?? 1) === 0;
+      if (!liveProduct) return true; // Producto eliminado de la DB
+      return liveProduct.isSoldOut || (liveProduct.stock ?? 1) === 0;
     });
 
-    if (soldOutItems.length > 0) {
-      alert(`⚠️ ¡ATENCIÓN! Tienes ${soldOutItems.length} producto(s) agotado(s) en tu bolsa. 
+    if (invalidItems.length > 0) {
+      alert(`⚠️ ¡ATENCIÓN! Tienes ${invalidItems.length} producto(s) no disponibles o agotados en tu bolsa. 
 
 Debes eliminarlos para poder proceder con el pedido por WhatsApp.`);
       return;
@@ -103,12 +101,10 @@ Debes eliminarlos para poder proceder con el pedido por WhatsApp.`);
           ) : (
             items.map((item) => {
               const liveProduct = allProducts.find(p => p.id === item.id);
-              const isActuallySoldOut = liveProduct 
-                ? (liveProduct.isSoldOut || (liveProduct.stock ?? 1) === 0)
-                : (item.isSoldOut || (item.stock ?? 1) === 0);
+              const isActuallySoldOut = !liveProduct || liveProduct.isSoldOut || (liveProduct.stock ?? 1) === 0;
               
-              const currentStock = liveProduct?.stock ?? item.stock ?? 1;
-              const isMaxStock = item.quantity >= currentStock;
+              const currentStock = liveProduct?.stock ?? 0;
+              const isMaxStock = item.quantity >= (currentStock || 1);
 
               return (
                 <div key={`${item.id}-${item.selectedSize}`} className="relative">
@@ -117,7 +113,9 @@ Debes eliminarlos para poder proceder con el pedido por WhatsApp.`);
                       <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                       {isActuallySoldOut && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
-                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest bg-black px-2 py-1 rounded border border-red-500/50">AGOTADO</span>
+                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest bg-black px-2 py-1 rounded border border-red-500/50">
+                            {!liveProduct ? 'NO DISPONIBLE' : 'AGOTADO'}
+                          </span>
                         </div>
                       )}
                     </div>
