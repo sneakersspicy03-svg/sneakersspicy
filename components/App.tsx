@@ -105,6 +105,10 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [activeBrand]);
 
+  useEffect(() => {
+    localStorage.setItem('spicy_cart', JSON.stringify(cartItems));
+  }, [cartItems]);
+
   const publishState = useCallback(async (updates: Partial<GlobalState>) => {
     setIsPublishing(true);
     try {
@@ -210,11 +214,19 @@ const App: React.FC = () => {
   const handleAddToCart = (p: Product, s: number | string) => {
     setCartItems(prev => {
       const exIndex = prev.findIndex(i => i.id === p.id && String(i.selectedSize) === String(s));
-      const newItems = exIndex > -1 
-        ? prev.map((item, idx) => idx === exIndex ? { ...item, quantity: item.quantity + 1 } : item)
-        : [...prev, { ...p, quantity: 1, selectedSize: s }];
-      localStorage.setItem('spicy_cart', JSON.stringify(newItems));
-      return newItems;
+      if (exIndex > -1) {
+        const item = prev[exIndex];
+        if (item.quantity >= (p.stock ?? 0)) {
+          alert("⚠️ No hay más stock disponible de este par.");
+          return prev;
+        }
+        return prev.map((item, idx) => idx === exIndex ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      if ((p.stock ?? 0) <= 0) {
+        alert("⚠️ Este producto está agotado.");
+        return prev;
+      }
+      return [...prev, { ...p, quantity: 1, selectedSize: s }];
     });
     setTimeout(() => setIsCartOpen(true), 50);
   };
@@ -255,7 +267,23 @@ const App: React.FC = () => {
         </section>
       </main>
 
-      <Cart whatsappTemplate={whatsappTemplate} logo={customLogo} isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} items={cartItems} onRemove={(id, s) => setCartItems(prev => prev.filter(i => !(i.id === id && String(i.selectedSize) === String(s))))} onUpdateQuantity={(id, s, d) => setCartItems(prev => prev.map(i => (i.id === id && String(i.selectedSize) === String(s)) ? { ...i, quantity: Math.max(1, i.quantity + d) } : i))} onClearCart={() => setCartItems([])} />
+      <Cart 
+        whatsappTemplate={whatsappTemplate} 
+        logo={customLogo} 
+        isOpen={isCartOpen} 
+        onClose={() => setIsCartOpen(false)} 
+        items={cartItems} 
+        onRemove={(id, s) => setCartItems(prev => prev.filter(i => !(i.id === id && String(i.selectedSize) === String(s))))} 
+        onUpdateQuantity={(id, s, d) => setCartItems(prev => prev.map(i => {
+          if (i.id === id && String(i.selectedSize) === String(s)) {
+            const newQty = Math.max(1, i.quantity + d);
+            if (d > 0 && newQty > (i.stock ?? 0)) return i;
+            return { ...i, quantity: newQty };
+          }
+          return i;
+        }))} 
+        onClearCart={() => setCartItems([])} 
+      />
       <TermsAndConditions logo={customLogo} isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} onSecretTrigger={() => { setIsTermsOpen(false); setIsDevPanelOpen(true); }} />
       {selectedProduct && <ProductDetail whatsappTemplate={whatsappTemplate} logo={customLogo} product={selectedProduct} onClose={() => setSelectedProduct(null)} onAddToCart={handleAddToCart} />}
       <AIConsultant isOpen={isAIExpertOpen} onClose={() => setIsAIExpertOpen(false)} />

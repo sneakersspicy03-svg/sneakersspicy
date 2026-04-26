@@ -19,7 +19,8 @@ export const PRODUCTS: Product[] = [
     description: 'El calzado que lo inició todo. Cuero de primera calidad y una silueta icónica que define la cultura sneaker.',
     category: 'Shoes',
     availableSizes: [7, 8, 9, 10, 11, 12],
-    condition: 'nuevo'
+    condition: 'nuevo',
+    stock: 5
   },
   {
     id: 's2',
@@ -30,7 +31,8 @@ export const PRODUCTS: Product[] = [
     description: 'Experimenta una energía épica con las Ultraboost más ligeras jamás fabricadas. Amortiguación técnica superior.',
     category: 'Shoes',
     availableSizes: [8, 9, 10, 11, 12],
-    condition: 'nuevo'
+    condition: 'nuevo',
+    stock: 5
   },
   {
     id: 'sw1',
@@ -41,7 +43,8 @@ export const PRODUCTS: Product[] = [
     description: 'Bermuda técnica Nike con tecnología Dri-FIT para absorber el sudor. Corte de alto rendimiento diseñado para movilidad total y frescura extrema.',
     category: 'Nike Dri-FIT Bermuda',
     availableSizes: ['L', 'XL', 'XXL'],
-    condition: 'nuevo'
+    condition: 'nuevo',
+    stock: 5
   },
   {
     id: 'sw2',
@@ -52,7 +55,8 @@ export const PRODUCTS: Product[] = [
     description: 'La icónica licra de una sola pierna. Proporciona soporte muscular asimétrico y una estética de nivel profesional.',
     category: 'Licra de una sola pierna',
     availableSizes: ['L', 'XL', 'XXL'],
-    condition: 'nuevo'
+    condition: 'nuevo',
+    stock: 5
   },
   {
     id: 'm1',
@@ -63,7 +67,8 @@ export const PRODUCTS: Product[] = [
     description: 'Medias Nike Everyday con amortiguación en la planta para mayor comodidad durante tus entrenamientos o el día a día.',
     category: 'Medias',
     availableSizes: ['M', 'L', 'XL'],
-    condition: 'nuevo'
+    condition: 'nuevo',
+    stock: 5
   },
   {
     id: 'm2',
@@ -74,7 +79,8 @@ export const PRODUCTS: Product[] = [
     description: 'Medias Jordan premium con soporte en el arco y tecnología de absorción de humedad.',
     category: 'Medias',
     availableSizes: ['M', 'L'],
-    condition: 'nuevo'
+    condition: 'nuevo',
+    stock: 5
   }
 ];
 

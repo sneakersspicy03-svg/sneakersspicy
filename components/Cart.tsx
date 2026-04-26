@@ -20,6 +20,12 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
   const handleCheckout = () => {
     if (items.length === 0) return;
 
+    const soldOutItems = items.filter(item => (item.stock ?? 0) === 0);
+    if (soldOutItems.length > 0) {
+      alert(`⚠️ Tienes ${soldOutItems.length} producto(s) agotado(s) en tu bolsa. Por favor, elimínalos para proceder con el pedido.`);
+      return;
+    }
+
     let detailsStr = "";
     items.forEach((item, index) => {
       detailsStr += `\n📦 PIEZA #${index + 1}:\n`;
@@ -84,43 +90,55 @@ const Cart: React.FC<CartProps> = ({ logo, whatsappTemplate, isOpen, onClose, it
               </div>
             </div>
           ) : (
-            items.map((item) => (
-              <div key={`${item.id}-${item.selectedSize}`} className="flex space-x-5 group animate-fade-in duration-300">
-                <div className="w-20 h-20 md:w-24 md:h-24 bg-zinc-900 rounded-2xl overflow-hidden flex-shrink-0 border border-white/5 relative">
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                </div>
-                <div className="flex-1 space-y-2 py-1">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold text-[11px] leading-tight uppercase tracking-tight text-white mb-1">{item.name}</h4>
-                      <p className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Talla: <span className="text-red-500">{item.selectedSize}</span></p>
-                    </div>
-                    <button onClick={() => onRemove(item.id, item.selectedSize)} className="text-zinc-700 hover:text-red-600 transition-colors p-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+            items.map((item) => {
+              const isSoldOut = (item.stock ?? 0) === 0;
+              const isMaxStock = item.quantity >= (item.stock ?? 0);
+
+              return (
+                <div key={`${item.id}-${item.selectedSize}`} className={`flex space-x-5 group animate-fade-in duration-300 relative ${isSoldOut ? 'grayscale opacity-50' : ''}`}>
+                  <div className="w-20 h-20 md:w-24 md:h-24 bg-zinc-900 rounded-2xl overflow-hidden flex-shrink-0 border border-white/5 relative">
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                    {isSoldOut && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
+                        <span className="text-[10px] font-black text-red-500 uppercase tracking-widest bg-black px-2 py-1 rounded border border-red-500/50">AGOTADO</span>
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 bg-zinc-900 rounded-lg p-1 border border-white/5">
-                      <button 
-                        onClick={() => onUpdateQuantity(item.id, item.selectedSize, -1)}
-                        className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md text-zinc-400 transition-colors font-bold"
-                      >
-                        -
-                      </button>
-                      <span className="text-xs font-black text-white w-5 text-center">{item.quantity}</span>
-                      <button 
-                        onClick={() => onUpdateQuantity(item.id, item.selectedSize, 1)}
-                        className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md text-zinc-400 transition-colors font-bold"
-                      >
-                        +
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-bold text-[11px] leading-tight uppercase tracking-tight text-white mb-1">{item.name}</h4>
+                        <p className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Talla: <span className="text-red-500">{item.selectedSize}</span></p>
+                      </div>
+                      <button onClick={() => onRemove(item.id, item.selectedSize)} className="text-zinc-700 hover:text-red-600 transition-colors p-1 relative z-20">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     </div>
-                    <p className="font-black text-sm italic text-white">RD${item.price * item.quantity}</p>
+                    
+                    <div className={`flex items-center justify-between ${isSoldOut ? 'pointer-events-none' : ''}`}>
+                      <div className="flex items-center space-x-2 bg-zinc-900 rounded-lg p-1 border border-white/5">
+                        <button 
+                          onClick={() => onUpdateQuantity(item.id, item.selectedSize, -1)}
+                          disabled={isSoldOut}
+                          className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md text-zinc-400 transition-colors font-bold disabled:opacity-20"
+                        >
+                          -
+                        </button>
+                        <span className="text-xs font-black text-white w-5 text-center">{item.quantity}</span>
+                        <button 
+                          onClick={() => onUpdateQuantity(item.id, item.selectedSize, 1)}
+                          disabled={isSoldOut || isMaxStock}
+                          className="w-7 h-7 flex items-center justify-center hover:bg-white/5 rounded-md text-zinc-400 transition-colors font-bold disabled:opacity-20"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <p className="font-black text-sm italic text-white">RD${item.price * item.quantity}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 

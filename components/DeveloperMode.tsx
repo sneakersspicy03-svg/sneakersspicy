@@ -68,7 +68,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const [newProduct, setNewProduct] = useState({
     name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo' as ProductCondition, 
-    images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }
+    images: { front: '', back: '', left: '', right: '', top: '', bottom: '' },
+    stock: 1
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -102,7 +103,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     setEditingProductId(null);
     setNewProduct({
       name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo' as ProductCondition, 
-      images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }
+      images: { front: '', back: '', left: '', right: '', top: '', bottom: '' },
+      stock: 1
     });
     setSizesText('');
     setSelectedSportwearSizes([]);
@@ -121,6 +123,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     setNewProduct({
       name: p.name, brand: p.brand, price: p.price, description: p.description || '', 
       category: p.category, condition: (p as any).condition || 'nuevo',
+      stock: p.stock ?? 1,
       images: {
         front: p.images?.front || p.image || '',
         back: p.images?.back || '',
@@ -202,7 +205,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       availableSizes: finalSizes, 
       image: newProduct.images.front, // Imagen principal mapeada desde front
       images: { ...newProduct.images }, 
-      isSoldOut: false
+      stock: newProduct.stock,
+      isSoldOut: newProduct.stock === 0
     };
 
     setIsSaving(true);
@@ -215,7 +219,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         await onAddProduct(confirmedProduct);
         alert(`✅ ¡Publicado! "${confirmedProduct.name}" ya está disponible vía URL.`);
       }
-      setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
+      setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', stock: 1, images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }});
       setSizesText('');
       setSelectedSportwearSizes([]);
       setEditingProductId(null);
@@ -349,7 +353,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                 <h4 className="text-2xl font-black italic uppercase">{editingProductId ? 'Editando Rúbrica' : 'Nueva Rúbrica de Producto'} (Modo URL)</h4>
                 <div className="flex items-center gap-4">
                   {editingProductId && (
-                    <button onClick={() => { setEditingProductId(null); setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }}); }} className="px-4 py-2 bg-zinc-800 text-[9px] font-black uppercase rounded-lg hover:bg-zinc-700">Cancelar Edición</button>
+                    <button onClick={() => { setEditingProductId(null); setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', stock: 1, images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }}); }} className="px-4 py-2 bg-zinc-800 text-[9px] font-black uppercase rounded-lg hover:bg-zinc-700">Cancelar Edición</button>
                   )}
                   <div className="flex space-x-2 bg-black p-1 rounded-2xl border border-white/5">
                     <button onClick={() => { setAddType('shoes'); setNewProduct(prev => ({...prev, category: 'Shoes'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'shoes' ? 'bg-white text-black' : 'text-zinc-500'}`}>👟 Calzado</button>
@@ -375,7 +379,16 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   </div>
                   <textarea placeholder="Reseña Técnica" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold h-32" />
                   <input placeholder="Tallas (EJ: 7, 8.5, 10)" value={sizesText} onChange={e => setSizesText(e.target.value)} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
-                  <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Precio RD$</label>
+                      <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Stock Disponible</label>
+                      <input type="number" min="0" placeholder="Cantidad" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
+                    </div>
+                  </div>
                   <button onClick={handleSaveProduct} disabled={isSaving} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl disabled:opacity-50">
                     {isSaving ? "SINCRONIZANDO..." : editingProductId ? "GUARDAR CAMBIOS" : "PUBLICAR PRODUCTO"}
                   </button>

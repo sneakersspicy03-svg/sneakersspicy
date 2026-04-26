@@ -25,6 +25,7 @@ export interface Product {
   availableSizes: (number | string)[];
   isSoldOut?: boolean;
   soldOutSizes?: (number | string)[];
+  stock: number;
 }
 
 export interface CartItem extends Product {
