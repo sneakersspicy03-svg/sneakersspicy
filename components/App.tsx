@@ -273,6 +273,7 @@ const App: React.FC = () => {
         isOpen={isCartOpen} 
         onClose={() => setIsCartOpen(false)} 
         items={cartItems} 
+        allProducts={currentProducts}
         onRemove={(id, s) => setCartItems(prev => prev.filter(i => !(i.id === id && String(i.selectedSize) === String(s))))} 
         onUpdateQuantity={(id, s, d) => setCartItems(prev => prev.map(i => {
           if (i.id === id && String(i.selectedSize) === String(s)) {
