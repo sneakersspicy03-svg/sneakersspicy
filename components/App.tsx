@@ -284,9 +284,51 @@ const App: React.FC = () => {
       />
 
       <main className="pb-20">
-        <Hero brands={tennisBrands} products={currentProducts} onBrandSelect={setActiveBrand} activeBrand={activeBrand} isDevMode={isDevMode} onSelectSize={handleSelectSize} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('shoes'); setIsDevPanelOpen(true); }} />
-        <Sportwear categories={currentCategories} products={currentProducts} onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} />
-        <Socks brands={socksBrands} products={currentProducts} onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} onSelectSize={handleSelectSize} isDevMode={isDevMode} onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} />
+        {currentSections.map((section) => {
+          const sectionName = section.name.toLowerCase();
+          
+          if (sectionName.includes('calzado') || sectionName.includes('tenis') || sectionName.includes('shoes')) {
+            return (
+              <Hero 
+                key={section.id}
+                brands={tennisBrands} 
+                products={currentProducts} 
+                onBrandSelect={setActiveBrand} 
+                activeBrand={activeBrand} 
+                isDevMode={isDevMode} 
+                onSelectSize={handleSelectSize} 
+                onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('shoes'); setIsDevPanelOpen(true); }} 
+              />
+            );
+          }
+
+          if (sectionName.includes('media') || sectionName.includes('socks')) {
+            return (
+              <Socks 
+                key={section.id}
+                brands={socksBrands} 
+                products={currentProducts} 
+                onBrandSelect={(b) => setFilters({ brand: b, size: null, category: section.name })} 
+                onSelectSize={handleSelectSize} 
+                isDevMode={isDevMode} 
+                onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} 
+              />
+            );
+          }
+
+          // Por defecto para Sportwear y cualquier otra categoría dinámica
+          return (
+            <Sportwear 
+              key={section.id}
+              categories={currentCategories.filter(c => c.name === section.name || sectionName.includes('ropa') || sectionName.includes('sportwear'))} 
+              products={currentProducts} 
+              onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
+              onSelectSize={handleSelectSize} 
+              isDevMode={isDevMode} 
+              onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
+            />
+          );
+        })}
         
         <section id="product-grid" className="px-4 md:px-20 py-24 scroll-mt-24">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
