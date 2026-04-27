@@ -357,7 +357,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
         <div className="sticky top-0 z-[160] px-4 md:px-10 py-5 border-b border-white/5 bg-zinc-900/80 backdrop-blur-xl flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-4 md:space-x-6 overflow-x-auto no-scrollbar">
-            <h3 className="text-red-600 font-black italic text-lg md:text-2xl tracking-tighter shrink-0">ADMIN_SPICY</h3>
+            <h3 className="text-red-600 font-black italic text-lg md:text-2xl tracking-tighter shrink-0">MODO_DEV</h3>
             {isAuthorized && (
               <div className="flex bg-black/50 p-1 rounded-xl border border-white/5 whitespace-nowrap">
                 <button onClick={() => handleTabChange('inventory')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Stock</button>
@@ -374,7 +374,13 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar overscroll-contain">
           {!isAuthorized ? (
             <div className="max-w-sm mx-auto py-24 space-y-6 text-center">
-               <div className="text-red-600 font-black text-6xl italic mb-10">SP</div>
+               <div className="mb-10">
+                  {logo ? (
+                    <img src={logo} alt="Logo" className="h-16 md:h-20 object-contain mx-auto" />
+                  ) : (
+                    <div className="text-red-600 font-black text-6xl italic">SP</div>
+                  )}
+               </div>
                <div className="space-y-4">
                   <input type="text" placeholder="USUARIO" className="w-full bg-zinc-900 border border-white/10 p-5 rounded-2xl text-xs font-bold text-white" onChange={e => setEmail(e.target.value)} value={email} />
                   <input type="password" placeholder="CONTRASEÑA" className="w-full bg-zinc-900 border border-white/10 p-5 rounded-2xl text-xs font-bold text-white" onChange={e => setPassword(e.target.value)} value={password} onKeyDown={e => e.key === 'Enter' && handleLogin()} />

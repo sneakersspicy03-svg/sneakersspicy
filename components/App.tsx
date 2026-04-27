@@ -265,8 +265,14 @@ const App: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-8 text-center">
-        <div className="text-red-600 font-[1000] text-8xl italic animate-pulse">SP</div>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-8 text-center p-10">
+        <div className="animate-pulse">
+          {customLogo ? (
+            <img src={customLogo} alt="Logo" className="h-24 md:h-32 object-contain mx-auto" />
+          ) : (
+            <div className="text-red-600 font-[1000] text-8xl italic">SP</div>
+          )}
+        </div>
         <p className="text-zinc-500 font-black uppercase tracking-[0.5em] text-[10px]">Sincronizando con Spicy Vault</p>
       </div>
     );
