@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../constants';
-import { Product, CartItem, BrandStock, FilterState, SportwearCategory } from '../types';
+import { Product, CartItem, BrandStock, FilterState, SportwearCategory, Section } from '../types';
 import { syncService, GlobalState, db } from '../services/syncService';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import Header from './Header';
@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>('¡Hola! Quiero confirmar el siguiente pedido:\n\n[DETALLES]\n\n• TOTAL FINAL: [TOTAL]\n\n¿Tienen disponibilidad para entrega hoy?');
   const [currentProducts, setCurrentProducts] = useState<Product[]>([]);
   const [currentCategories, setCurrentCategories] = useState<SportwearCategory[]>([]);
+  const [currentSections, setCurrentSections] = useState<Section[]>([]);
   const [tennisBrands, setTennisBrands] = useState<BrandStock[]>([]);
   const [socksBrands, setSocksBrands] = useState<BrandStock[]>([]);
 
@@ -55,6 +56,7 @@ const App: React.FC = () => {
         if (cloudState) {
           setCurrentProducts(cloudState.products || []);
           setCurrentCategories(cloudState.categories || []);
+          setCurrentSections(cloudState.sections || []);
           setTennisBrands(cloudState.tennisBrands || []);
           setSocksBrands(cloudState.socksBrands || []);
           setCustomLogo(cloudState.logo);
@@ -84,7 +86,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "banners"), (snapshot) => {
+    const unsubBanners = onSnapshot(collection(db, "banners"), (snapshot) => {
       const banners: any[] = [];
       snapshot.forEach((doc) => {
         banners.push({ id: doc.id, ...doc.data() });
@@ -102,7 +104,19 @@ const App: React.FC = () => {
          setActiveBrand(tBrands[0]);
       }
     });
-    return () => unsubscribe();
+
+    const unsubSections = onSnapshot(collection(db, "sections"), (snapshot) => {
+      const sections: Section[] = [];
+      snapshot.forEach((doc) => {
+        sections.push({ id: doc.id, ...doc.data() } as Section);
+      });
+      setCurrentSections(sections.sort((a, b) => a.orderIndex - b.orderIndex));
+    });
+
+    return () => {
+      unsubBanners();
+      unsubSections();
+    };
   }, [activeBrand]);
 
   useEffect(() => {
@@ -115,6 +129,7 @@ const App: React.FC = () => {
       const newState: GlobalState = {
         products: updates.products ?? currentProducts,
         categories: updates.categories ?? currentCategories,
+        sections: updates.sections ?? currentSections,
         tennisBrands: updates.tennisBrands ?? tennisBrands,
         socksBrands: updates.socksBrands ?? socksBrands,
         logo: updates.logo ?? customLogo,
@@ -294,6 +309,7 @@ const App: React.FC = () => {
         whatsappTemplate={whatsappTemplate} onUpdateWhatsAppTemplate={(t) => { setWhatsappTemplate(t); publishState({ whatsappTemplate: t }); }}
         isOpen={isDevPanelOpen} onClose={() => { setIsDevPanelOpen(false); setInitialDevBrand(undefined); setInitialDevType(undefined); }}
         products={currentProducts} categories={currentCategories} tennisBrands={tennisBrands} socksBrands={socksBrands}
+        sections={currentSections}
         isAuthorized={isAdminAuthorized} initialBrand={initialDevBrand} initialType={initialDevType}
         onLoginSuccess={() => { setIsAdminAuthorized(true); setIsDevMode(true); }}
         onAddProduct={async np => { 
@@ -344,6 +360,39 @@ const App: React.FC = () => {
           handleDeleteBanner(id, 'sportwear');
         }}
         onUpdateCategory={uc => handleUpdateBanner(uc, 'sportwear')}
+        onAddSection={async ns => {
+          setIsPublishing(true);
+          try {
+            await syncService.saveSection(ns);
+          } finally { setIsPublishing(false); }
+        }}
+        onUpdateSection={async us => {
+          setIsPublishing(true);
+          try {
+            await syncService.updateSection(us.id, us);
+          } finally { setIsPublishing(false); }
+        }}
+        onDeleteSection={async id => {
+          if(confirm('¿Eliminar esta sección? Los productos vinculados podrían quedar huérfanos.')) {
+            setIsPublishing(true);
+            try {
+              await syncService.deleteSection(id);
+            } finally { setIsPublishing(false); }
+          }
+        }}
+        onReorderSections={async (s, t) => {
+          const list = [...currentSections];
+          const [r] = list.splice(s, 1);
+          list.splice(t, 0, r);
+          const updated = list.map((item, index) => ({ ...item, orderIndex: index }));
+          setCurrentSections(updated);
+          setIsPublishing(true);
+          try {
+            for (const item of updated) {
+              await syncService.updateSection(item.id, { orderIndex: item.orderIndex });
+            }
+          } finally { setIsPublishing(false); }
+        }}
         onReorderTennis={(s, t) => { const list = [...tennisBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setTennisBrands(list); publishState({ tennisBrands: list }); }}
         onReorderSocks={(s, t) => { const list = [...socksBrands]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setSocksBrands(list); publishState({ socksBrands: list }); }}
         onReorderCategory={(s, t) => { const list = [...currentCategories]; const [r] = list.splice(s, 1); list.splice(t, 0, r); setCurrentCategories(list); publishState({ categories: list }); }}
@@ -357,6 +406,7 @@ const App: React.FC = () => {
           const cloudState = await syncService.fetchState();
           if (cloudState) {
             setCurrentProducts(cloudState.products);
+            setCurrentSections(cloudState.sections || []);
             setTennisBrands(cloudState.tennisBrands);
             setSocksBrands(cloudState.socksBrands);
             setCurrentCategories(cloudState.categories);

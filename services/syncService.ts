@@ -1,7 +1,7 @@
 
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc, addDoc } from "firebase/firestore";
-import { Product, SportwearCategory, BrandStock } from '../types';
+import { Product, SportwearCategory, BrandStock, Section } from '../types';
 
 const firebaseConfig = { 
   apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I", 
@@ -49,6 +49,7 @@ const extractPublicId = (url: string): string | null => {
 export interface GlobalState {
   products: Product[];
   categories: SportwearCategory[];
+  sections: Section[];
   tennisBrands: BrandStock[];
   socksBrands: BrandStock[];
   logo: string | null;
@@ -160,6 +161,36 @@ export const syncService = {
     await deleteDoc(doc(db, "banners", id));
   },
 
+  // SECTIONS CRUD
+  saveSection: async (section: Omit<Section, 'id'>): Promise<string> => {
+    const docRef = await addDoc(collection(db, "sections"), {
+      ...section,
+      lastUpdated: Date.now()
+    });
+    return docRef.id;
+  },
+
+  updateSection: async (id: string, section: Partial<Section>): Promise<void> => {
+    const docRef = doc(db, "sections", id);
+    await updateDoc(docRef, { ...section, lastUpdated: Date.now() });
+  },
+
+  deleteSection: async (id: string): Promise<void> => {
+    await deleteDoc(doc(db, "sections", id));
+  },
+
+  getSections: async (): Promise<Section[]> => {
+    try {
+      const snap = await getDocs(collection(db, "sections"));
+      const sections: Section[] = [];
+      snap.forEach(doc => sections.push({ id: doc.id, ...doc.data() } as Section));
+      return sections.sort((a, b) => a.orderIndex - b.orderIndex);
+    } catch (e) {
+      console.error("Error fetching sections:", e);
+      return [];
+    }
+  },
+
   getBanners: async (): Promise<any[]> => {
     try {
       const snap = await getDocs(collection(db, "banners"));
@@ -189,12 +220,14 @@ export const syncService = {
 
       // Fetch banners
       const bannersList = await syncService.getBanners();
+      const sectionsList = await syncService.getSections();
 
       if (configSnap.exists()) {
         const configData = configSnap.data();
         return {
           ...configData,
           products: productsList,
+          sections: sectionsList,
           tennisBrands: bannersList.filter(b => b.type === 'tennis'),
           socksBrands: bannersList.filter(b => b.type === 'socks'),
           categories: bannersList.filter(b => b.type === 'sportwear'),
@@ -203,6 +236,7 @@ export const syncService = {
       }
       return { 
         products: productsList, 
+        sections: sectionsList,
         categories: bannersList.filter(b => b.type === 'sportwear'), 
         tennisBrands: bannersList.filter(b => b.type === 'tennis'), 
         socksBrands: bannersList.filter(b => b.type === 'socks'), 
@@ -217,7 +251,7 @@ export const syncService = {
   pushState: async (state: GlobalState): Promise<boolean> => {
     try {
       const docRef = doc(db, "config", "global_state");
-      const { products, categories, tennisBrands, socksBrands, ...restOfState } = state;
+      const { products, categories, sections, tennisBrands, socksBrands, ...restOfState } = state;
       await setDoc(docRef, { ...restOfState, lastUpdated: Date.now() });
       return true;
     } catch (error) {

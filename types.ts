@@ -9,6 +9,16 @@ export interface ProductImages {
 }
 
 export type ProductCondition = 'nuevo' | 'nuevo_sin_caja' | 'como_nuevo' | 'usados_baratos';
+export type SizeInputType = 'numeric' | 'clothing_letters';
+
+export interface Section {
+  id: string;
+  name: string;
+  emoji: string;
+  orderIndex: number;
+  photoCount: number; // 1-6
+  sizeInputType: SizeInputType;
+}
 
 export interface Product {
   id: string;
@@ -20,7 +30,8 @@ export interface Product {
   images?: ProductImages; 
   asset3d?: string; 
   description: string;
-  category: string;
+  category: string; // Nombre de la sección para compatibilidad
+  sectionId?: string; // ID de la nueva colección
   condition?: ProductCondition;
   availableSizes: (number | string)[];
   isSoldOut?: boolean;

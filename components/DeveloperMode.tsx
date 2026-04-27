@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock } from '../types';
+import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock, Section, SizeInputType } from '../types';
 import { doc, updateDoc, setDoc, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { syncService, db } from '../services/syncService';
 
@@ -43,6 +43,12 @@ interface DeveloperModeProps {
   onReorderTennis: (source: number, target: number) => void;
   onReorderSocks: (source: number, target: number) => void;
   onReorderCategory: (source: number, target: number) => void;
+
+  sections: Section[];
+  onAddSection: (s: Omit<Section, 'id'>) => Promise<void>;
+  onUpdateSection: (s: Section) => Promise<void>;
+  onDeleteSection: (id: string) => Promise<void>;
+  onReorderSections: (source: number, target: number) => void;
 }
 
 type AddType = 'shoes' | 'sportwear' | 'socks';
@@ -53,9 +59,23 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   onAddTennisBrand, onDeleteTennisBrand, onUpdateTennisBrand,
   onAddSocksBrand, onDeleteSocksBrand, onUpdateSocksBrand,
   onAddCategory, onDeleteCategory, onUpdateCategory,
-  onReorderTennis, onReorderSocks, onReorderCategory
+  onReorderTennis, onReorderSocks, onReorderCategory,
+  sections, onAddSection, onUpdateSection, onDeleteSection, onReorderSections
 }) => {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'add' | 'banners' | 'config'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'add' | 'banners' | 'sections' | 'config'>('inventory');
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [showAddSectionForm, setShowAddSectionForm] = useState(false);
+  const [newSectionData, setNewSectionData] = useState<Omit<Section, 'id' | 'orderIndex'>>({
+    name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric'
+  });
+  const [editingSection, setEditingSection] = useState<Section | null>(null);
+
+  useEffect(() => {
+    if (activeTab === 'add' && !selectedSectionId && sections.length > 0) {
+      setSelectedSectionId(sections[0].id);
+      setNewProduct(prev => ({ ...prev, category: sections[0].name }));
+    }
+  }, [activeTab, sections, selectedSectionId]);
   const [addType, setAddType] = useState<AddType>('shoes');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,18 +98,20 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Mapear el tipo de producto al tipo de banner en Firestore
-    const bannerTypeMap: Record<string, string> = {
-      'shoes': 'tennis',
-      'sportwear': 'sportwear',
-      'socks': 'socks'
-    };
+    const selectedSection = sections.find(s => s.id === selectedSectionId);
+    let bannerType = 'tennis';
     
-    const currentBannerType = bannerTypeMap[addType] || 'tennis';
-    
+    if (selectedSection) {
+      const name = selectedSection.name.toLowerCase();
+      if (name.includes('calzado') || name.includes('shoes') || name.includes('tenis')) bannerType = 'tennis';
+      else if (name.includes('media') || name.includes('socks')) bannerType = 'socks';
+      else if (name.includes('ropa') || name.includes('sportwear') || name.includes('prenda')) bannerType = 'sportwear';
+      else bannerType = 'tennis'; // Default
+    }
+
     const q = query(
       collection(db, 'banners'), 
-      where('type', '==', currentBannerType)
+      where('type', '==', bannerType)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -110,7 +132,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     setSelectedSportwearSizes([]);
   };
 
-  const handleTabChange = (tab: 'inventory' | 'add' | 'banners' | 'config') => {
+  const handleTabChange = (tab: 'inventory' | 'add' | 'banners' | 'sections' | 'config') => {
     if (tab === 'add' && activeTab !== 'add') {
       resetForm();
     }
@@ -199,12 +221,23 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     }
 
     const productId = editingProductId || `spicy-${Date.now()}`;
+    const selectedSection = sections.find(s => s.id === selectedSectionId);
+    
+    // Filtrar solo las imágenes que tienen URL
+    const imagesArray = Object.values(newProduct.images).filter(url => !!url);
+
     const productToSave: any = {
-      id: productId, name: newProduct.name, brand: newProduct.brand, marca: newProduct.brand, price: newProduct.price, description: newProduct.description, 
-      category: addType === 'shoes' ? 'Shoes' : (addType === 'socks' ? 'Medias' : 'Sportwear'), 
+      id: productId, 
+      name: newProduct.name, 
+      brand: newProduct.brand, 
+      marca: newProduct.brand, 
+      price: newProduct.price, 
+      description: newProduct.description, 
+      category: selectedSection?.name || newProduct.category,
+      sectionId: selectedSectionId,
       availableSizes: finalSizes, 
-      image: newProduct.images.front, // Imagen principal mapeada desde front
-      images: { ...newProduct.images }, 
+      image: newProduct.images.front, 
+      images: imagesArray, // Guardar como array para mayor flexibilidad dinámica
       stock: newProduct.stock,
       isSoldOut: newProduct.stock === 0
     };
@@ -329,6 +362,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
               <div className="flex bg-black/50 p-1 rounded-xl border border-white/5 whitespace-nowrap">
                 <button onClick={() => handleTabChange('inventory')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'inventory' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Stock</button>
                 <button onClick={() => handleTabChange('add')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'add' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>+ Nuevo</button>
+                <button onClick={() => handleTabChange('sections')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'sections' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Secciones</button>
                 <button onClick={() => handleTabChange('banners')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'banners' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>Banners</button>
                 <button onClick={() => handleTabChange('config')} className={`px-3 md:px-4 py-2 rounded-lg text-[9px] font-black uppercase transition-all ${activeTab === 'config' ? 'bg-red-600 text-white shadow-lg' : 'text-zinc-500'}`}>⚙️</button>
               </div>
@@ -355,80 +389,115 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   {editingProductId && (
                     <button onClick={() => { setEditingProductId(null); setNewProduct({ name: '', brand: '', price: 0, description: '', category: 'Shoes', condition: 'nuevo', stock: 1, images: { front: '', back: '', left: '', right: '', top: '', bottom: '' }}); }} className="px-4 py-2 bg-zinc-800 text-[9px] font-black uppercase rounded-lg hover:bg-zinc-700">Cancelar Edición</button>
                   )}
-                  <div className="flex space-x-2 bg-black p-1 rounded-2xl border border-white/5">
-                    <button onClick={() => { setAddType('shoes'); setNewProduct(prev => ({...prev, category: 'Shoes'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'shoes' ? 'bg-white text-black' : 'text-zinc-500'}`}>👟 Calzado</button>
-                    <button onClick={() => { setAddType('sportwear'); setNewProduct(prev => ({...prev, category: 'Sportwear'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'sportwear' ? 'bg-white text-black' : 'text-zinc-500'}`}>🎽 Sportwear</button>
-                    <button onClick={() => { setAddType('socks'); setNewProduct(prev => ({...prev, category: 'Medias'})); }} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase ${addType === 'socks' ? 'bg-white text-black' : 'text-zinc-500'}`}>🧦 Medias</button>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                <div className="space-y-8">
-                  <div className="grid grid-cols-2 gap-4">
-                    <input placeholder="Modelo" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold" />
-                    <select 
-                      value={newProduct.brand} 
-                      onChange={e => setNewProduct({...newProduct, brand: e.target.value})} 
-                      className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold text-white appearance-none cursor-pointer hover:border-red-600/50 transition-colors"
-                    >
-                      <option value="" disabled>Selecciona una marca</option>
-                      {dbBrands.map((brandName, idx) => (
-                        <option key={idx} value={brandName}>{brandName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <textarea placeholder="Reseña Técnica" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold h-32" />
-                  <input placeholder="Tallas (EJ: 7, 8.5, 10)" value={sizesText} onChange={e => setSizesText(e.target.value)} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Precio RD$</label>
-                      <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Stock Disponible</label>
-                      <input type="number" min="0" placeholder="Cantidad" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
-                    </div>
-                  </div>
-                  <button onClick={handleSaveProduct} disabled={isSaving} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl disabled:opacity-50">
-                    {isSaving ? "SINCRONIZANDO..." : editingProductId ? "GUARDAR CAMBIOS" : "PUBLICAR PRODUCTO"}
-                  </button>
-                </div>
-                <div className="space-y-6">
-                  <p className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] mb-4">Captura de Imágenes (Upload Only)</p>
-                  <div className="grid grid-cols-2 gap-6">
-                    {(addType === 'shoes' ? ['front', 'back', 'left', 'right', 'top', 'bottom'] : ['front', 'back']).map((slot) => (
-                      <div key={slot} className="flex flex-col space-y-3 bg-black/40 p-5 rounded-3xl border border-white/5 group hover:border-red-600/30 transition-all">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[9px] font-[1000] uppercase text-zinc-500 tracking-widest">{slot}</label>
-                          {newProduct.images[slot as keyof ProductImages] && (
-                            <span className="text-[8px] font-black text-green-500 flex items-center gap-1 animate-pulse">
-                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>
-                              LISTO
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <label className="flex-1 cursor-pointer group/btn overflow-hidden">
-                             <div className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 border-dashed transition-all ${newProduct.images[slot as keyof ProductImages] ? 'border-green-600/20 bg-green-600/5' : 'border-zinc-800 bg-zinc-900/50 hover:border-red-600/40 hover:bg-zinc-900'}`}>
-                               <svg className={`w-5 h-5 ${newProduct.images[slot as keyof ProductImages] ? 'text-green-500' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                               <span className="text-[10px] font-black uppercase text-white tracking-tighter">
-                                 {newProduct.images[slot as keyof ProductImages] ? "Cambiar" : "Subir Foto"}
-                               </span>
-                             </div>
-                             <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, slot)} accept="image/*" />
-                          </label>
-                          {newProduct.images[slot as keyof ProductImages] && (
-                            <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/10 shrink-0 shadow-2xl rotate-2 hover:rotate-0 transition-transform">
-                               <img src={newProduct.images[slot as keyof ProductImages]} className="w-full h-full object-cover" alt="Preview" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                  <div className="flex flex-wrap gap-2 bg-black p-1 rounded-2xl border border-white/5">
+                    {sections.map(section => (
+                      <button 
+                        key={section.id}
+                        onClick={() => { 
+                          setSelectedSectionId(section.id); 
+                          setNewProduct(prev => ({...prev, category: section.name})); 
+                        }} 
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedSectionId === section.id ? 'bg-white text-black' : 'text-zinc-500 hover:text-white'}`}
+                      >
+                        {section.emoji} {section.name}
+                      </button>
                     ))}
                   </div>
                 </div>
               </div>
+
+              {selectedSectionId ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-4">
+                      <input placeholder="Modelo" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold" />
+                      <select 
+                        value={newProduct.brand} 
+                        onChange={e => setNewProduct({...newProduct, brand: e.target.value})} 
+                        className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold text-white appearance-none cursor-pointer hover:border-red-600/50 transition-colors"
+                      >
+                        <option value="" disabled>Selecciona una marca</option>
+                        {dbBrands.map((brandName, idx) => (
+                          <option key={idx} value={brandName}>{brandName}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea placeholder="Reseña Técnica" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold h-32" />
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">
+                        {sections.find(s => s.id === selectedSectionId)?.sizeInputType === 'numeric' ? 'Tallas Numéricas (EJ: 7, 8.5, 10)' : 'Tallas por Letras (EJ: S, M, L, XL)'}
+                      </label>
+                      <input 
+                        placeholder={sections.find(s => s.id === selectedSectionId)?.sizeInputType === 'numeric' ? "EJ: 7, 8.5, 10" : "EJ: S, M, L, XL"} 
+                        value={sizesText} 
+                        onChange={e => setSizesText(e.target.value)} 
+                        className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Precio RD$</label>
+                        <input type="number" placeholder="Precio RD$" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 ml-2">Stock Disponible</label>
+                        <input type="number" min="0" placeholder="Cantidad" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: Number(e.target.value)})} className="w-full bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-black text-red-500" />
+                      </div>
+                    </div>
+                    <button onClick={handleSaveProduct} disabled={isSaving} className="w-full bg-white text-black py-5 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-xl disabled:opacity-50">
+                      {isSaving ? "SINCRONIZANDO..." : editingProductId ? "GUARDAR CAMBIOS" : "PUBLICAR PRODUCTO"}
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <p className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.3em] mb-4">Captura de Imágenes (Upload Only)</p>
+                    <div className="grid grid-cols-2 gap-6">
+                      {Array.from({ length: sections.find(s => s.id === selectedSectionId)?.photoCount || 2 }).map((_, idx) => {
+                        const slots = ['front', 'back', 'left', 'right', 'top', 'bottom'];
+                        const slot = slots[idx];
+                        return (
+                          <div key={slot} className="flex flex-col space-y-3 bg-black/40 p-5 rounded-3xl border border-white/5 group hover:border-red-600/30 transition-all">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[9px] font-[1000] uppercase text-zinc-500 tracking-widest">{slot}</label>
+                              {newProduct.images[slot as keyof ProductImages] && (
+                                <span className="text-[8px] font-black text-green-500 flex items-center gap-1 animate-pulse">
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>
+                                  LISTO
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <label className="flex-1 cursor-pointer group/btn overflow-hidden">
+                                 <div className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 border-dashed transition-all ${newProduct.images[slot as keyof ProductImages] ? 'border-green-600/20 bg-green-600/5' : 'border-zinc-800 bg-zinc-900/50 hover:border-red-600/40 hover:bg-zinc-900'}`}>
+                                   <svg className={`w-5 h-5 ${newProduct.images[slot as keyof ProductImages] ? 'text-green-500' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                   <span className="text-[10px] font-black uppercase text-white tracking-tighter">
+                                     {newProduct.images[slot as keyof ProductImages] ? "Cambiar" : "Subir Foto"}
+                                   </span>
+                                 </div>
+                                 <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, slot)} accept="image/*" />
+                              </label>
+                              {newProduct.images[slot as keyof ProductImages] && (
+                                <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/10 shrink-0 shadow-2xl rotate-2 hover:rotate-0 transition-transform">
+                                   <img src={newProduct.images[slot as keyof ProductImages]} className="w-full h-full object-cover" alt="Preview" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-20 text-center space-y-4">
+                  <div className="text-zinc-800 text-6xl font-black uppercase italic">Selecciona una Sección</div>
+                  <p className="text-zinc-600 text-[10px] font-black uppercase tracking-widest">Para comenzar a cargar productos en la bóveda.</p>
+                </div>
+              )}
             </div>
+
           ) : activeTab === 'banners' ? (
             <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">
               <h4 className="text-3xl font-black italic uppercase text-white border-l-4 border-red-600 pl-6 tracking-tighter">Diseño & Banners (Modo URL)</h4>
@@ -518,6 +587,108 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   </div>
                 );
               })}
+            </div>
+          ) : activeTab === 'sections' ? (
+            <div className="max-w-6xl mx-auto space-y-12 pb-20 animate-fade-in">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 pb-8">
+                <div>
+                  <h4 className="text-2xl font-black italic uppercase">Gestión de Secciones</h4>
+                  <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest mt-1">Controla las categorías dinámicas y sus rúbricas.</p>
+                </div>
+                <button 
+                  onClick={() => setShowAddSectionForm(true)} 
+                  className="px-8 py-4 bg-red-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:brightness-110 active:scale-95 transition-all"
+                >
+                  + Nueva Sección
+                </button>
+              </div>
+
+              {showAddSectionForm && (
+                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/10 space-y-6 animate-slide-up">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Emoji</label>
+                      <input 
+                        value={newSectionData.emoji} 
+                        onChange={e => setNewSectionData({...newSectionData, emoji: e.target.value})} 
+                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xl text-center" 
+                      />
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Nombre de Sección</label>
+                      <input 
+                        placeholder="EJ: Calzado Pro" 
+                        value={newSectionData.name} 
+                        onChange={e => setNewSectionData({...newSectionData, name: e.target.value})} 
+                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Fotos (1-6)</label>
+                      <input 
+                        type="number" min="1" max="6" 
+                        value={newSectionData.photoCount} 
+                        onChange={e => setNewSectionData({...newSectionData, photoCount: Number(e.target.value)})} 
+                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold" 
+                      />
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Tipo de Tallas</label>
+                      <select 
+                        value={newSectionData.sizeInputType} 
+                        onChange={e => setNewSectionData({...newSectionData, sizeInputType: e.target.value as SizeInputType})} 
+                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold text-white"
+                      >
+                        <option value="numeric">Numérico (7, 8.5, 10...)</option>
+                        <option value="clothing_letters">Letras (S, M, L, XL...)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex space-x-4 pt-4">
+                    <button 
+                      onClick={async () => {
+                        await onAddSection({ ...newSectionData, orderIndex: sections.length });
+                        setShowAddSectionForm(false);
+                        setNewSectionData({ name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
+                      }} 
+                      className="flex-1 bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all"
+                    >
+                      Guardar Sección
+                    </button>
+                    <button onClick={() => setShowAddSectionForm(false)} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sections.map((section, idx) => (
+                  <div 
+                    key={section.id} 
+                    draggable 
+                    onDragStart={(e) => e.dataTransfer.setData('text/plain', idx.toString())}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      const sourceIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                      onReorderSections(sourceIdx, idx);
+                    }}
+                    className="bg-black/40 p-6 rounded-[2.5rem] border border-white/5 group hover:border-red-600/30 transition-all relative overflow-hidden"
+                  >
+                    <div className="flex items-center space-x-5">
+                      <div className="text-4xl bg-zinc-900 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner">{section.emoji}</div>
+                      <div className="flex-1">
+                        <h5 className="font-black text-sm uppercase italic tracking-tighter">{section.name}</h5>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="text-[8px] font-black bg-zinc-800 px-2 py-0.5 rounded text-zinc-500 uppercase">{section.photoCount} FOTOS</span>
+                          <span className="text-[8px] font-black bg-zinc-800 px-2 py-0.5 rounded text-zinc-500 uppercase">{section.sizeInputType === 'numeric' ? 'NUM' : 'ALF'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="absolute top-6 right-6 flex space-x-2">
+                      <button onClick={() => onDeleteSection(section.id)} className="p-2 text-zinc-700 hover:text-red-500 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" /></svg></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : activeTab === 'config' ? (
             <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">
