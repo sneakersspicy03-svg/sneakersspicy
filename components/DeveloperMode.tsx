@@ -605,6 +605,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
               {showAddSectionForm && (
                 <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/10 space-y-6 animate-slide-up">
+                  <div className="flex justify-between items-center mb-2">
+                    <h5 className="text-sm font-black uppercase text-red-600 italic">{editingSection ? 'Editando Sección' : 'Nueva Sección'}</h5>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="space-y-2">
                       <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Emoji</label>
@@ -647,15 +650,20 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <div className="flex space-x-4 pt-4">
                     <button 
                       onClick={async () => {
-                        await onAddSection({ ...newSectionData, orderIndex: sections.length });
+                        if (editingSection) {
+                          await onUpdateSection({ ...editingSection, ...newSectionData });
+                          setEditingSection(null);
+                        } else {
+                          await onAddSection({ ...newSectionData, orderIndex: sections.length });
+                        }
                         setShowAddSectionForm(false);
                         setNewSectionData({ name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
                       }} 
-                      className="flex-1 bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all"
+                      className="flex-1 bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all shadow-xl"
                     >
-                      Guardar Sección
+                      {editingSection ? 'Guardar Cambios' : 'Crear Sección'}
                     </button>
-                    <button onClick={() => setShowAddSectionForm(false)} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
+                    <button onClick={() => { setShowAddSectionForm(false); setEditingSection(null); setNewSectionData({ name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' }); }} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
                   </div>
                 </div>
               )}
@@ -674,7 +682,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     className="bg-black/40 p-6 rounded-[2.5rem] border border-white/5 group hover:border-red-600/30 transition-all relative overflow-hidden"
                   >
                     <div className="flex items-center space-x-5">
-                      <div className="text-4xl bg-zinc-900 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner">{section.emoji}</div>
+                      <div className="text-4xl bg-zinc-900 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner group-hover:scale-110 transition-transform">{section.emoji}</div>
                       <div className="flex-1">
                         <h5 className="font-black text-sm uppercase italic tracking-tighter">{section.name}</h5>
                         <div className="flex items-center space-x-2 mt-1">
@@ -683,12 +691,25 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                         </div>
                       </div>
                     </div>
-                    <div className="absolute top-6 right-6 flex space-x-2">
-                      <button onClick={() => onDeleteSection(section.id)} className="p-2 text-zinc-700 hover:text-red-500 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" /></svg></button>
+                    <div className="absolute top-6 right-6 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setEditingSection(section);
+                          setNewSectionData({ name: section.name, emoji: section.emoji, photoCount: section.photoCount, sizeInputType: section.sizeInputType });
+                          setShowAddSectionForm(true);
+                        }} 
+                        className="p-2 text-zinc-500 hover:text-blue-500 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2.5"/></svg>
+                      </button>
+                      <button onClick={() => onDeleteSection(section.id)} className="p-2 text-zinc-500 hover:text-red-500 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth="2" /></svg>
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
+
             </div>
           ) : activeTab === 'config' ? (
             <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">

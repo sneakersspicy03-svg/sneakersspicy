@@ -56,7 +56,24 @@ const App: React.FC = () => {
         if (cloudState) {
           setCurrentProducts(cloudState.products || []);
           setCurrentCategories(cloudState.categories || []);
-          setCurrentSections(cloudState.sections || []);
+          
+          // Lógica de Seeding para Secciones
+          if (!cloudState.sections || cloudState.sections.length === 0) {
+            const defaultSections: Omit<Section, 'id'>[] = [
+              { name: "Calzado", emoji: "👟", photoCount: 6, sizeInputType: "numeric", orderIndex: 0 },
+              { name: "Sportware", emoji: "👕", photoCount: 2, sizeInputType: "clothing_letters", orderIndex: 1 },
+              { name: "Medias", emoji: "🧦", photoCount: 2, sizeInputType: "clothing_letters", orderIndex: 2 }
+            ];
+            for (const s of defaultSections) {
+              await syncService.saveSection(s);
+            }
+            // Recargar secciones después del seeding
+            const freshSections = await syncService.getSections();
+            setCurrentSections(freshSections);
+          } else {
+            setCurrentSections(cloudState.sections);
+          }
+
           setTennisBrands(cloudState.tennisBrands || []);
           setSocksBrands(cloudState.socksBrands || []);
           setCustomLogo(cloudState.logo);
