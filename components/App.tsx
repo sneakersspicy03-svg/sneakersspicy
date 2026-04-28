@@ -297,6 +297,8 @@ const App: React.FC = () => {
             return (
               <Hero 
                 key={section.id}
+                title={section.name}
+                subtitle={section.subtitle}
                 brands={tennisBrands} 
                 products={currentProducts} 
                 onBrandSelect={setActiveBrand} 
@@ -312,6 +314,8 @@ const App: React.FC = () => {
             return (
               <Socks 
                 key={section.id}
+                title={section.name}
+                subtitle={section.subtitle}
                 brands={socksBrands} 
                 products={currentProducts} 
                 onBrandSelect={(b) => setFilters({ brand: b, size: null, category: section.name })} 
@@ -326,6 +330,8 @@ const App: React.FC = () => {
           return (
             <Sportwear 
               key={section.id}
+              title={section.name}
+              subtitle={section.subtitle}
               categories={currentCategories.filter(c => c.name === section.name || sectionName.includes('ropa') || sectionName.includes('sportwear'))} 
               products={currentProducts} 
               onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 

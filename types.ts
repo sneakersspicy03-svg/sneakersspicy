@@ -10,10 +10,12 @@ export interface ProductImages {
 
 export type ProductCondition = 'nuevo' | 'nuevo_sin_caja' | 'como_nuevo' | 'usados_baratos';
 export type SizeInputType = 'numeric' | 'clothing_letters';
+export type BannerFormat = 'vertical' | 'horizontal' | 'rectangular';
 
 export interface Section {
   id: string;
   name: string;
+  subtitle?: string;
   emoji: string;
   orderIndex: number;
   photoCount: number; // 1-6
@@ -60,6 +62,7 @@ export interface BrandStock {
   bannerTitle?: string;    // Texto en blanco
   bannerSubtitle?: string; // Texto en gris/badge
   type?: 'tennis' | 'socks' | 'sportwear';
+  format?: BannerFormat;
 }
 
 
@@ -71,6 +74,7 @@ export interface SportwearCategory {
   bannerTitle?: string;    // Texto en blanco
   bannerSubtitle?: string; // Texto en gris/badge
   type?: 'tennis' | 'socks' | 'sportwear';
+  format?: BannerFormat;
 }
 
 export interface FilterState {

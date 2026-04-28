@@ -10,6 +10,8 @@ interface HeroProps {
   isDevMode?: boolean;
   onQuickAdd?: (brandName: string) => void;
   onSelectSize?: (brand: string, size: number | string) => void;
+  title?: string;
+  subtitle?: string;
 }
 
 const Hero: React.FC<HeroProps> = ({ 
@@ -19,7 +21,9 @@ const Hero: React.FC<HeroProps> = ({
   activeBrand, 
   isDevMode = false,
   onQuickAdd,
-  onSelectSize
+  onSelectSize,
+  title,
+  subtitle
 }) => {
   return (
     <div className="relative min-h-screen w-full overflow-hidden flex flex-col bg-[#020202] pt-28 pb-12 transition-all duration-700">
@@ -33,11 +37,11 @@ const Hero: React.FC<HeroProps> = ({
             <div className="flex items-center space-x-4">
               <span className="w-12 h-[1px] bg-red-500/50"></span>
               <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">
-                {isDevMode ? 'PROTOCOLO DE ACCESO TOTAL' : 'Inventario Élite'}
+                {subtitle || (isDevMode ? 'PROTOCOLO DE ACCESO TOTAL' : 'Inventario Élite')}
               </span>
             </div>
             <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">
-              Calzado de <span className="text-white/20">Basket</span>
+              {title || <>Calzado de <span className="text-white/20">Basket</span></>}
             </h2>
           </div>
         </div>
@@ -54,11 +58,13 @@ const Hero: React.FC<HeroProps> = ({
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => Number(a) - Number(b));
 
+              const formatClass = brand.format === 'vertical' ? 'aspect-[9/16]' : brand.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
+
               return (
                 <div
                   key={brand.name}
                   onClick={() => onBrandSelect(brand)}
-                  className={`relative h-[50vh] md:h-[60vh] rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
+                  className={`relative ${formatClass} rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
                 >
                   <img src={brand.marqueeImage} alt={brand.name} className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out group-hover:scale-110" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent transition-opacity duration-700"></div>

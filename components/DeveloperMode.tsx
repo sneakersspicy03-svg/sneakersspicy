@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock, Section, SizeInputType } from '../types';
+import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock, Section, SizeInputType, BannerFormat } from '../types';
 import { doc, updateDoc, setDoc, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { syncService, db } from '../services/syncService';
 
@@ -66,7 +66,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [showAddSectionForm, setShowAddSectionForm] = useState(false);
   const [newSectionData, setNewSectionData] = useState<Omit<Section, 'id' | 'orderIndex'>>({
-    name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric'
+    name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric'
   });
   const [editingSection, setEditingSection] = useState<Section | null>(null);
 
@@ -83,7 +83,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [selectedSportwearSizes, setSelectedSportwearSizes] = useState<string[]>([]);
   
   const [showAddBannerForm, setShowAddBannerForm] = useState<{section: string | null}>({section: null});
-  const [newBannerData, setNewBannerData] = useState({ name: '', title: '', subtitle: '', image: '', brand: '' });
+  const [newBannerData, setNewBannerData] = useState({ name: '', title: '', subtitle: '', image: '', brand: '', format: 'horizontal' as BannerFormat });
   const [editingBanner, setEditingBanner] = useState<{type: 'tennis' | 'socks' | 'sportwear', data: any} | null>(null);
 
   const [newProduct, setNewProduct] = useState({
@@ -272,12 +272,12 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       if (showAddBannerForm.section === 'Calzado') sizes = [7, 8, 9, 10, 11, 12];
       else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
       else sizes = ['Talla Única'];
-      const common = { name: newBannerData.name || newBannerData.title, marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes };
+      const common = { name: newBannerData.name || newBannerData.title, marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes, format: newBannerData.format };
       if (showAddBannerForm.section === 'Calzado') await onAddTennisBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
       else if (showAddBannerForm.section === 'Medias') await onAddSocksBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
       else if (showAddBannerForm.section === 'Sportwear') await onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: newBannerData.image });
       setShowAddBannerForm({section: null}); 
-      setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: ''});
+      setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: '', format: 'horizontal' });
     } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
   };
 
@@ -308,6 +308,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
           bannerSubtitle: updatedData.bannerSubtitle || '',
           marqueeImage: updatedData.marqueeImage || '',
           image: updatedData.image || '',
+          format: updatedData.format || 'horizontal',
           lastUpdated: updatedData.lastUpdated
         });
       }
@@ -514,6 +515,21 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     <input value={editingBanner.data.name} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, name: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-400" placeholder="Nombre de Marca (Nike, Jordan...)" />
                     <input value={editingBanner.data.bannerTitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerTitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco" />
                     <input value={editingBanner.data.bannerSubtitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerSubtitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris" />
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Formato Visual</label>
+                      <div className="flex gap-2">
+                        {(['horizontal', 'vertical', 'rectangular'] as BannerFormat[]).map(f => (
+                          <button 
+                            key={f}
+                            onClick={() => setEditingBanner({...editingBanner, data: {...editingBanner.data, format: f}})}
+                            className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${editingBanner.data.format === f ? 'bg-red-600 text-white shadow-lg' : 'bg-black text-zinc-500 hover:text-white'}`}
+                          >
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="flex items-center space-x-4">
                         <div className="flex-1 bg-black border border-white/5 p-4 rounded-xl text-[10px] font-bold text-zinc-500 italic">
                             {editingBanner.data.marqueeImage || editingBanner.data.image ? "✅ Imagen cargada" : "Selecciona nueva imagen"}
@@ -547,6 +563,21 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                             <input value={newBannerData.name} onChange={e => setNewBannerData({...newBannerData, name: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold" placeholder="Nombre (Nike...)" />
                             <input value={newBannerData.title} onChange={e => setNewBannerData({...newBannerData, title: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco (Obligatorio)" />
                             <input value={newBannerData.subtitle} onChange={e => setNewBannerData({...newBannerData, subtitle: e.target.value})} className="bg-zinc-900 border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris (Opcional)" />
+                            <div className="space-y-2">
+                              <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Formato Visual</label>
+                              <div className="flex gap-2">
+                                {(['horizontal', 'vertical', 'rectangular'] as BannerFormat[]).map(f => (
+                                  <button 
+                                    key={f}
+                                    onClick={() => setNewBannerData({...newBannerData, format: f})}
+                                    className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${newBannerData.format === f ? 'bg-red-600 text-white shadow-lg' : 'bg-zinc-900 text-zinc-500 hover:text-white'}`}
+                                  >
+                                    {f}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
                             <div className="flex items-center space-x-4">
                                 <div className="flex-1 bg-zinc-900 border border-white/5 p-4 rounded-xl text-[10px] font-bold text-zinc-500 italic">
                                     {newBannerData.image ? "✅ Imagen lista" : "Subir imagen del banner"}
@@ -625,13 +656,23 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     </div>
                     <div className="space-y-2 lg:col-span-2">
                       <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Nombre de Sección</label>
-                      <input 
-                        placeholder="EJ: Calzado Pro" 
-                        value={newSectionData.name} 
-                        onChange={e => setNewSectionData({...newSectionData, name: e.target.value})} 
-                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold" 
+                      <input
+                        placeholder="EJ: Calzado Pro"
+                        value={newSectionData.name}
+                        onChange={e => setNewSectionData({...newSectionData, name: e.target.value})}
+                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold"
                       />
                     </div>
+                    <div className="space-y-2 lg:col-span-2">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Subtítulo (Opcional)</label>
+                      <input
+                        placeholder="EJ: INVENTARIO ELITE"
+                        value={newSectionData.subtitle}
+                        onChange={e => setNewSectionData({...newSectionData, subtitle: e.target.value})}
+                        className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold"
+                      />
+                    </div>
+
                     <div className="space-y-2">
                       <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Fotos (1-6)</label>
                       <input 
@@ -663,13 +704,13 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                           await onAddSection({ ...newSectionData, orderIndex: sections.length });
                         }
                         setShowAddSectionForm(false);
-                        setNewSectionData({ name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
+                        setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
                       }} 
                       className="flex-1 bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all shadow-xl"
                     >
                       {editingSection ? 'Guardar Cambios' : 'Crear Sección'}
                     </button>
-                    <button onClick={() => { setShowAddSectionForm(false); setEditingSection(null); setNewSectionData({ name: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' }); }} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
+                    <button onClick={() => { setShowAddSectionForm(false); setEditingSection(null); setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' }); }} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
                   </div>
                 </div>
               )}
@@ -701,7 +742,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                       <button 
                         onClick={() => {
                           setEditingSection(section);
-                          setNewSectionData({ name: section.name, emoji: section.emoji, photoCount: section.photoCount, sizeInputType: section.sizeInputType });
+                          setNewSectionData({ name: section.name, subtitle: section.subtitle || '', emoji: section.emoji, photoCount: section.photoCount, sizeInputType: section.sizeInputType });
                           setShowAddSectionForm(true);
                         }} 
                         className="p-2 text-zinc-500 hover:text-blue-500 transition-colors"

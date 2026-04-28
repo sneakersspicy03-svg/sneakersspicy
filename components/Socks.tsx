@@ -9,11 +9,13 @@ interface SocksProps {
   onQuickAdd?: (brand: string) => void;
   isDevMode?: boolean;
   onSelectSize?: (brand: string, size: number | string, category: string) => void;
+  title?: string;
+  subtitle?: string;
 }
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?auto=format&fit=crop&q=80&w=1200';
 
-const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickAdd, isDevMode = false, onSelectSize }) => {
+const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickAdd, isDevMode = false, onSelectSize, title, subtitle }) => {
   return (
     <div className="relative w-full overflow-hidden flex flex-col bg-[#020202] py-24 transition-all duration-700">
       <div className="relative z-10 w-full max-w-[1600px] mx-auto">
@@ -21,9 +23,9 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
           <div className="space-y-2">
             <div className="flex items-center space-x-4">
               <span className="w-12 h-[1px] bg-red-500/50"></span>
-              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">Premium Accessories</span>
+              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">{subtitle || 'Premium Accessories'}</span>
             </div>
-            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">Medias <span className="text-white/20">Elite</span></h2>
+            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">{title || <>Medias <span className="text-white/20">Elite</span></>}</h2>
           </div>
         </div>
 
@@ -39,11 +41,13 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 
+              const formatClass = brand.format === 'vertical' ? 'aspect-[9/16]' : brand.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
+
               return (
                 <div
                   key={brand.name}
                   onClick={() => onBrandSelect(brand.name)}
-                  className={`relative h-[55vh] md:h-[65vh] rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/50'}`}
+                  className={`relative ${formatClass} rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/50'}`}
                 >
                   <img src={brand.marqueeImage} alt={brand.name} className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110" onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>

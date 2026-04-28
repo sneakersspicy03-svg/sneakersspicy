@@ -8,9 +8,11 @@ interface SportwearProps {
   onSelectSize?: (brand: string, size: string, category: string) => void;
   onQuickAdd?: (brand: string) => void;
   isDevMode?: boolean;
+  title?: string;
+  subtitle?: string;
 }
 
-const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false }) => {
+const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false, title, subtitle }) => {
   if (!categories || !Array.isArray(categories)) return null;
 
   return (
@@ -20,9 +22,9 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
           <div className="space-y-2">
             <div className="flex items-center space-x-4">
               <span className="w-12 h-[1px] bg-red-500/50"></span>
-              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">Performance Collection</span>
+              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-red-500/60">{subtitle || 'Performance Collection'}</span>
             </div>
-            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">Sport<span className="text-white/20">wear</span></h2>
+            <h2 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">{title || <>Sport<span className="text-white/20">wear</span></>}</h2>
           </div>
         </div>
 
@@ -43,11 +45,13 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
               const allSizes = brandProducts.flatMap(p => p.availableSizes);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 
+              const formatClass = cat.format === 'vertical' ? 'aspect-[9/16]' : cat.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
+
               return (
                 <div
                   key={index}
                   onClick={() => onCategorySelect(cat.brand || 'Nike', cat.name)}
-                  className={`relative h-[65vh] md:h-[75vh] rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
+                  className={`relative ${formatClass} rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
                 >
                   <img src={cat.image} alt={title} className="w-full h-full object-cover transition-transform duration-[2500ms] group-hover:scale-110" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/10 to-transparent"></div>
