@@ -1,19 +1,21 @@
 
 import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
 import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc, addDoc } from "firebase/firestore";
 import { Product, SportwearCategory, BrandStock, Section } from '../types';
 
-const firebaseConfig = { 
-  apiKey: (import.meta as any).env?.VITE_GEMINI_API_KEY || "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I", 
-  authDomain: "sneakers-spicy-db.firebaseapp.com", 
-  projectId: "sneakers-spicy-db", 
-  storageBucket: "sneakers-spicy-db.firebasestorage.app", 
-  messagingSenderId: "362351464666", 
-  appId: "1:362351464666:web:09df3f0104784a2764d5e3", 
-  measurementId: "G-D14B0HS8HC" 
+const firebaseConfig = {
+  apiKey: "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I",
+  authDomain: "sneakers-spicy-db.firebaseapp.com",
+  projectId: "sneakers-spicy-db",
+  storageBucket: "sneakers-spicy-db.firebasestorage.app",
+  messagingSenderId: "362351464666",
+  appId: "1:362351464666:web:09df3f0104784a2764d5e3",
+  measurementId: "G-D14B0HS8HC"
 };
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
+export const analytics = getAnalytics(app);
 export const db = getFirestore(app);
 
 // CLOUDINARY CONFIG
