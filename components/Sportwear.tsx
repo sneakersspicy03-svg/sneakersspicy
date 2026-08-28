@@ -14,7 +14,18 @@ interface SportwearProps {
 
 const FALLBACK_SPORTWEAR_IMAGE = 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=800';
 
-const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false, title, subtitle }) => {
+const CLOTHING_SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'];
+
+export const Sportwear: React.FC<SportwearProps> = ({ 
+  categories, 
+  products, 
+  onCategorySelect, 
+  onSelectSize, 
+  onQuickAdd, 
+  isDevMode = false, 
+  title, 
+  subtitle 
+}) => {
   if (!categories || !Array.isArray(categories) || categories.length === 0) return null;
 
   return (
@@ -33,28 +44,52 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {categories.map((cat, index) => {
-              const brandName = (cat.brand || 'Nike').toUpperCase();
+              const brandName = (cat.brand || cat.name || 'Sportwear').toUpperCase();
               const bannerTitle = cat.bannerTitle || cat.name;
 
-              // Calcular tallas dinámicas - Filtro por marca y categoría
+              // Calcular tallas dinámicas reales vinculadas al inventario disponible
               const brandProducts = products.filter(p => {
                 const bName = String(cat.brand || "").trim().toLowerCase();
+                const cName = String(cat.name || "").trim().toLowerCase();
                 const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
                 const pCat = String(p.category || "").trim().toLowerCase();
-                const cName = String(cat.name || "").trim().toLowerCase();
-                return pBrand === bName && (pCat === cName || pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa')) && !p.isSoldOut;
+                
+                const matchesBrand = bName && (pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand));
+                const matchesCatName = cName && (pBrand === cName || pCat === cName || pCat.includes(cName) || cName.includes(pCat));
+                const isGeneralSportwear = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra');
+                
+                const matches = matchesBrand || matchesCatName || (isGeneralSportwear && (!cat.brand || pBrand === bName || !bName));
+                const isAvailable = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
+                
+                return matches && isAvailable;
               });
-              const allSizes = brandProducts.flatMap(p => p.availableSizes || []);
-              const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
-              const displaySizes = dynamicSizes.length > 0 ? dynamicSizes : (cat.availableSizes && cat.availableSizes.length > 0 ? cat.availableSizes : ['S', 'M', 'L', 'XL', 'XXL']);
+
+              // Extraer sólo tallas con stock real
+              const allAvailableSizes = brandProducts.flatMap(p => {
+                const soldOuts = (p.soldOutSizes || []).map(String);
+                return (p.availableSizes || []).filter(s => !soldOuts.includes(String(s)));
+              });
+
+              // Ordenar tallas lógicamente
+              const dynamicSizes = Array.from(new Set(allAvailableSizes)).sort((a, b) => {
+                const idxA = CLOTHING_SIZE_ORDER.indexOf(String(a).toUpperCase());
+                const idxB = CLOTHING_SIZE_ORDER.indexOf(String(b).toUpperCase());
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return String(a).localeCompare(String(b), undefined, { numeric: true });
+              });
 
               const formatClass = cat.format === 'vertical' ? 'aspect-[9/16]' : cat.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
               const bannerImg = cat.image || cat.marqueeImage || FALLBACK_SPORTWEAR_IMAGE;
 
+              const targetBrand = cat.brand || cat.name;
+              const targetCategory = cat.name || 'Sportwear';
+
               return (
                 <div
                   key={cat.id || index}
-                  onClick={() => onCategorySelect(cat.brand || 'Nike', cat.name)}
+                  onClick={() => onCategorySelect(targetBrand, targetCategory)}
                   className={`relative ${formatClass} rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
                 >
                   <img 
@@ -76,20 +111,61 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
                     </div>
                   </div>
 
-                  <div className="absolute inset-0 bg-black/85 backdrop-blur-3xl transition-all duration-700 flex flex-col items-center justify-center p-10 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 text-center">
-                     <div className="space-y-8 w-full max-w-[280px]">
+                  {/* Overlay al hacer Hover */}
+                  <div className="absolute inset-0 bg-black/85 backdrop-blur-3xl transition-all duration-700 flex flex-col items-center justify-center p-10 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 text-center z-50">
+                     <div className="space-y-6 w-full max-w-[280px]">
                         <div className="space-y-2">
                           <div className="text-red-600 font-black text-6xl italic tracking-tighter">SP</div>
-                          <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">Seleccionar Talla</p>
+                          <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">
+                            {dynamicSizes.length > 0 ? 'Seleccionar Talla' : 'Colección Sportwear'}
+                          </p>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {displaySizes.map(size => (
-                            <button key={size} onClick={(e) => { e.stopPropagation(); onSelectSize?.(cat.brand || 'Nike', String(size), cat.name); }} className="aspect-square rounded-2xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white transition-all text-sm font-black italic">{size}</button>
-                          ))}
-                          {isDevMode && (
-                            <button onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(cat.brand || 'Nike'); }} className="aspect-square rounded-2xl border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"><span className="text-xl font-bold">+</span></button>
-                          )}
-                        </div>
+
+                        {/* Mostrar ÚNICAMENTE tallas disponibles si existen */}
+                        {dynamicSizes.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-3">
+                            {dynamicSizes.map(size => (
+                              <button 
+                                key={size} 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  onSelectSize?.(targetBrand, String(size), targetCategory); 
+                                }} 
+                                className="aspect-square rounded-2xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white transition-all text-sm font-black italic shadow-lg"
+                              >
+                                {size}
+                              </button>
+                            ))}
+                            {isDevMode && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(targetBrand); }} 
+                                className="aspect-square rounded-2xl border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"
+                              >
+                                <span className="text-xl font-bold">+</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                onCategorySelect(targetBrand, targetCategory); 
+                              }}
+                              className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/40"
+                            >
+                              Ver Colección
+                            </button>
+                            {isDevMode && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(targetBrand); }} 
+                                className="w-full py-2.5 border-2 border-dashed border-red-500/50 rounded-xl text-red-500 hover:bg-red-500 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+                              >
+                                + Añadir Pieza a este Banner
+                              </button>
+                            )}
+                          </div>
+                        )}
                      </div>
                   </div>
                 </div>

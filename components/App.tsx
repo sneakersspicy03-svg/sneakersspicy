@@ -113,6 +113,16 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const unsubProducts = onSnapshot(collection(db, "productos"), (snapshot) => {
+      const prods: Product[] = [];
+      snapshot.forEach((doc) => {
+        prods.push({ id: doc.id, ...doc.data() } as Product);
+      });
+      if (prods.length > 0) {
+        setCurrentProducts(prods);
+      }
+    });
+
     const unsubBanners = onSnapshot(collection(db, "banners"), (snapshot) => {
       const banners: any[] = [];
       snapshot.forEach((doc) => {
@@ -145,6 +155,7 @@ const App: React.FC = () => {
     });
 
     return () => {
+      unsubProducts();
       unsubBanners();
       unsubSections();
     };
@@ -227,32 +238,38 @@ const App: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     return currentProducts.filter(p => {
-      const bMatch = !filters.brand || (p.marca && p.marca.toLowerCase() === filters.brand.toLowerCase()) || (p.brand && p.brand.toLowerCase() === filters.brand.toLowerCase());
-      const sMatch = !filters.size || (p.availableSizes && p.availableSizes.map(String).includes(String(filters.size)));
-      const cMatch = !filters.category || p.category === filters.category || (p.category && p.category.toLowerCase() === filters.category.toLowerCase()) || (filters.category.toLowerCase().includes('sportwear') && p.category?.toLowerCase().includes('sportwear'));
-      return bMatch && sMatch && cMatch;
+      const pBrand = String(p.marca || p.brand || '').trim().toLowerCase();
+      const pCat = String(p.category || '').trim().toLowerCase();
+      const fBrand = filters.brand ? filters.brand.trim().toLowerCase() : null;
+      const fCat = filters.category ? filters.category.trim().toLowerCase() : null;
+
+      let bMatch = true;
+      if (fBrand) {
+        bMatch = pBrand === fBrand || pBrand.includes(fBrand) || fBrand.includes(pBrand);
+      }
+
+      let cMatch = true;
+      if (fCat) {
+        if (fCat.includes('sportwear') || fCat.includes('sportware') || fCat.includes('ropa') || fCat.includes('bermuda') || fCat.includes('licra')) {
+          cMatch = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat === fCat;
+        } else {
+          cMatch = pCat === fCat || pCat.includes(fCat) || fCat.includes(pCat);
+        }
+      }
+
+      let sMatch = true;
+      if (filters.size) {
+        const soldOuts = (p.soldOutSizes || []).map(String);
+        sMatch = (p.availableSizes || []).map(String).includes(String(filters.size)) && !soldOuts.includes(String(filters.size));
+      }
+
+      const isBannerMatching = (fBrand && fCat) 
+        ? (bMatch && cMatch) || (pBrand === fBrand) || (pCat === fCat) || (pBrand === fCat)
+        : (bMatch && cMatch);
+
+      return isBannerMatching && sMatch;
     });
   }, [currentProducts, filters]);
-
-  // REPARAR VINCULACIÓN: Consulta directa a Firestore por marca
-  useEffect(() => {
-    if (filters.brand) {
-      const q = query(collection(db, 'productos'), where('marca', '==', filters.brand));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const brandSpecificProducts: Product[] = [];
-        snapshot.forEach((doc) => {
-          brandSpecificProducts.push({ id: doc.id, ...doc.data() } as Product);
-        });
-        
-        // Sincronizar con el estado global sin duplicar
-        setCurrentProducts(prev => {
-          const otherProducts = prev.filter(p => p.marca !== filters.brand && p.brand !== filters.brand);
-          return [...brandSpecificProducts, ...otherProducts];
-        });
-      });
-      return () => unsubscribe();
-    }
-  }, [filters.brand]);
 
   const handleSelectSize = (brand: string, size: number | string, category?: string) => {
     setFilters({ brand, size, category: category || null });
