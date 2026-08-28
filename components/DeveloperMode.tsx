@@ -333,44 +333,33 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     if (!editingBanner) return;
     setIsSaving(true);
     try {
-      const bannerId = editingBanner.data.id;
+      const bannerId = editingBanner.data.id || editingBanner.data.uid || `banner-${Date.now()}`;
       const updatedData = { 
         ...editingBanner.data, 
-        marqueeImage: editingBanner.data.marqueeImage || editingBanner.data.image, 
-        image: editingBanner.data.image || editingBanner.data.marqueeImage,
+        id: bannerId,
+        name: editingBanner.data.name || '',
+        bannerTitle: editingBanner.data.bannerTitle || editingBanner.data.name || '',
+        bannerSubtitle: editingBanner.data.bannerSubtitle || '',
+        marqueeImage: editingBanner.data.marqueeImage || editingBanner.data.image || '', 
+        image: editingBanner.data.image || editingBanner.data.marqueeImage || '',
+        format: editingBanner.data.format || 'horizontal',
+        type: editingBanner.type,
         lastUpdated: Date.now()
       };
 
-      // QA FIX: Si el banner no tiene ID (es de las constantes), lo creamos en Firestore
-      if (!bannerId) {
-        const newId = `banner-${Date.now()}`;
-        updatedData.id = newId;
-        const bannerRef = doc(db, 'banners', newId);
-        await setDoc(bannerRef, { ...updatedData, type: editingBanner.type });
-      } else {
-        // REPARAR BUG: Actualización directa en Firestore según instrucciones
-        const bannerRef = doc(db, 'banners', bannerId);
-        await updateDoc(bannerRef, { 
-          name: updatedData.name || '',
-          bannerTitle: updatedData.bannerTitle || '',
-          bannerSubtitle: updatedData.bannerSubtitle || '',
-          marqueeImage: updatedData.marqueeImage || '',
-          image: updatedData.image || '',
-          format: updatedData.format || 'horizontal',
-          lastUpdated: updatedData.lastUpdated
-        });
-      }
+      const bannerRef = doc(db, 'banners', bannerId);
+      await setDoc(bannerRef, updatedData, { merge: true });
 
-      // Sincronizar estado local (AWAITED para QA)
+      // Sincronizar estado local
       if (editingBanner.type === 'tennis') await onUpdateTennisBrand(updatedData);
       else if (editingBanner.type === 'socks') await onUpdateSocksBrand(updatedData);
       else if (editingBanner.type === 'sportwear') await onUpdateCategory(updatedData);
 
       setEditingBanner(null);
-      alert("✅ Banner actualizado en base de datos.");
+      alert("✅ Banner actualizado exitosamente en base de datos.");
     } catch (e: any) { 
       console.error("Error al actualizar banner:", e);
-      alert(`❌ Error de persistencia: ${e.message}`); 
+      alert(`❌ Error al guardar banner: ${e.message || 'Error desconocido'}`); 
     } finally { 
       setIsSaving(false); 
     }
@@ -557,44 +546,112 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
           ) : activeTab === 'banners' ? (
             <div className="max-w-5xl mx-auto space-y-12 pb-20 animate-fade-in">
               <h4 className="text-3xl font-black italic uppercase text-white border-l-4 border-red-600 pl-6 tracking-tighter">Diseño & Banners (Modo URL)</h4>
+              {/* Modal Flotante para Editar Banner */}
               {editingBanner && (
-                <div className="bg-zinc-900 p-8 rounded-[2rem] border border-red-600/50 space-y-6 animate-scale-in shadow-2xl">
-                  <h5 className="text-lg font-black uppercase text-red-600 italic">Editar Banner: {editingBanner.data.name}</h5>
-                  <div className="grid grid-cols-1 gap-4">
-                    <input value={editingBanner.data.name} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, name: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-400" placeholder="Nombre de Marca (Nike, Jordan...)" />
-                    <input value={editingBanner.data.bannerTitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerTitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-black text-white" placeholder="Título Blanco" />
-                    <input value={editingBanner.data.bannerSubtitle} onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerSubtitle: e.target.value}})} className="bg-black border border-white/5 p-4 rounded-xl text-xs font-bold text-zinc-500" placeholder="Subtítulo Gris" />
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Formato Visual</label>
-                      <div className="flex gap-2">
-                        {(['horizontal', 'vertical', 'rectangular'] as BannerFormat[]).map(f => (
-                          <button 
-                            key={f}
-                            onClick={() => setEditingBanner({...editingBanner, data: {...editingBanner.data, format: f}})}
-                            className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${editingBanner.data.format === f ? 'bg-red-600 text-white shadow-lg' : 'bg-black text-zinc-500 hover:text-white'}`}
-                          >
-                            {f}
-                          </button>
-                        ))}
-                      </div>
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+                  <div className="bg-zinc-950 p-6 md:p-8 rounded-[2.5rem] border border-red-600/50 space-y-6 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-scale-in">
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <h5 className="text-xl font-black uppercase text-red-600 italic">
+                        Editar Banner: {editingBanner.data.name || 'Sin Nombre'}
+                      </h5>
+                      <button 
+                        onClick={() => setEditingBanner(null)}
+                        className="p-2 text-zinc-400 hover:text-white rounded-full bg-zinc-900"
+                      >
+                        ✕
+                      </button>
                     </div>
 
-                    <div className="flex items-center space-x-4">
-                        <div className="flex-1 bg-black border border-white/5 p-4 rounded-xl text-[10px] font-bold text-zinc-500 italic">
-                            {editingBanner.data.marqueeImage || editingBanner.data.image ? "✅ Imagen cargada" : "Selecciona nueva imagen"}
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Nombre / Marca</label>
+                        <input 
+                          value={editingBanner.data.name || ''} 
+                          onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, name: e.target.value}})} 
+                          className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold text-white focus:border-red-500 focus:outline-none" 
+                          placeholder="Nombre de Marca (Nike, Sets...)" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Título Principal (Texto Blanco)</label>
+                        <input 
+                          value={editingBanner.data.bannerTitle || ''} 
+                          onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerTitle: e.target.value}})} 
+                          className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-black text-white focus:border-red-500 focus:outline-none" 
+                          placeholder="Título Blanco" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-zinc-500 mb-1 block">Subtítulo (Texto Gris / Badge)</label>
+                        <input 
+                          value={editingBanner.data.bannerSubtitle || ''} 
+                          onChange={e => setEditingBanner({...editingBanner, data: {...editingBanner.data, bannerSubtitle: e.target.value}})} 
+                          className="w-full bg-black border border-white/10 p-4 rounded-xl text-xs font-bold text-zinc-400 focus:border-red-500 focus:outline-none" 
+                          placeholder="Subtítulo Gris" 
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 block">Formato Visual</label>
+                        <div className="flex gap-2">
+                          {(['horizontal', 'vertical', 'rectangular'] as BannerFormat[]).map(f => (
+                            <button 
+                              key={f}
+                              type="button"
+                              onClick={() => setEditingBanner({...editingBanner, data: {...editingBanner.data, format: f}})}
+                              className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${
+                                (editingBanner.data.format || 'horizontal') === f 
+                                  ? 'bg-red-600 text-white shadow-lg shadow-red-900/50' 
+                                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-white/5'
+                              }`}
+                            >
+                              {f}
+                            </button>
+                          ))}
                         </div>
-                        <label className="cursor-pointer bg-red-600 p-4 rounded-xl hover:bg-red-700 transition-all shadow-lg active:scale-95">
-                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase text-zinc-500 block">Imagen del Banner</label>
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-1 bg-black border border-white/10 p-4 rounded-xl text-[10px] font-bold text-zinc-400 italic truncate">
+                            {editingBanner.data.marqueeImage || editingBanner.data.image ? "✅ Imagen asignada" : "Selecciona una imagen"}
+                          </div>
+                          <label className="cursor-pointer bg-red-600 hover:bg-red-500 p-4 rounded-xl transition-all shadow-lg active:scale-95 text-white">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'marqueeImage', 'banner')} accept="image/*" />
-                        </label>
+                          </label>
+                        </div>
+                      </div>
+
+                      {(editingBanner.data.marqueeImage || editingBanner.data.image) && (
+                        <div className="rounded-xl overflow-hidden border border-white/10 aspect-video bg-black">
+                          <img 
+                            src={editingBanner.data.marqueeImage || editingBanner.data.image} 
+                            className="w-full h-full object-cover" 
+                            alt="Preview" 
+                          />
+                        </div>
+                      )}
                     </div>
-                    {(editingBanner.data.marqueeImage || editingBanner.data.image) && (
-                      <img src={editingBanner.data.marqueeImage || editingBanner.data.image} className="aspect-video w-full object-cover rounded-xl" />
-                    )}
-                  </div>
-                  <div className="flex space-x-3">
-                    <button onClick={handleSaveEditBanner} disabled={isSaving} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-red-700">Actualizar</button>
-                    <button onClick={() => setEditingBanner(null)} className="px-6 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
+
+                    <div className="flex space-x-3 pt-2">
+                      <button 
+                        onClick={handleSaveEditBanner} 
+                        disabled={isSaving} 
+                        className="flex-1 bg-red-600 hover:bg-red-500 text-white py-4 rounded-xl font-black text-xs uppercase shadow-xl active:scale-95 transition-all"
+                      >
+                        {isSaving ? 'Guardando...' : 'Actualizar Banner'}
+                      </button>
+                      <button 
+                        onClick={() => setEditingBanner(null)} 
+                        className="px-6 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 py-4 rounded-xl font-black text-xs uppercase hover:text-white transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

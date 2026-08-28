@@ -385,7 +385,10 @@ const App: React.FC = () => {
                 subtitle={section.subtitle}
                 categories={sectionCategories.length > 0 ? sectionCategories : currentCategories} 
                 products={currentProducts} 
-                onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
+                onCategorySelect={(b, c) => {
+                  setFilters({brand: b, size: null, category: c});
+                  document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+                }} 
                 onSelectSize={handleSelectSize} 
                 isDevMode={isDevMode} 
                 onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
@@ -408,7 +411,10 @@ const App: React.FC = () => {
               subtitle="Performance Collection"
               categories={currentCategories} 
               products={currentProducts} 
-              onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
+              onCategorySelect={(b, c) => {
+                setFilters({brand: b, size: null, category: c});
+                document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }} 
               onSelectSize={handleSelectSize} 
               isDevMode={isDevMode} 
               onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
@@ -416,7 +422,10 @@ const App: React.FC = () => {
             <Socks 
               brands={socksBrands} 
               products={currentProducts} 
-              onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} 
+              onBrandSelect={(b) => {
+                setFilters({ brand: b, size: null, category: 'Medias' });
+                document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }} 
               onSelectSize={handleSelectSize} 
               isDevMode={isDevMode} 
               onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} 
@@ -436,7 +445,10 @@ const App: React.FC = () => {
             subtitle="Performance Collection"
             categories={currentCategories} 
             products={currentProducts} 
-            onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
+            onCategorySelect={(b, c) => {
+              setFilters({brand: b, size: null, category: c});
+              document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+            }} 
             onSelectSize={handleSelectSize} 
             isDevMode={isDevMode} 
             onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
