@@ -236,12 +236,14 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const handleSaveProduct = async () => {
     let finalSizes: (string | number)[] = [];
-    if (addType === 'shoes') {
-      finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
+    if (sizesText && sizesText.trim()) {
+      finalSizes = sizesText.split(',').map(s => s.trim().toUpperCase()).filter(s => s !== '');
+    } else if (selectedSportwearSizes.length > 0) {
+      finalSizes = selectedSportwearSizes.map(s => s.trim().toUpperCase());
     } else if (addType === 'sportwear') {
-      finalSizes = selectedSportwearSizes.length > 0 
-        ? selectedSportwearSizes 
-        : (sizesText ? sizesText.split(',').map(s => s.trim().toUpperCase()).filter(s => s !== '') : ['M', 'L', 'XL']);
+      finalSizes = ['XL'];
+    } else if (addType === 'shoes') {
+      finalSizes = [7, 8, 9, 10, 11];
     } else {
       finalSizes = ['Talla Única'];
     }
