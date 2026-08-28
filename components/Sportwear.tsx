@@ -53,6 +53,7 @@ export const Sportwear: React.FC<SportwearProps> = ({
                 const bName = String(cat.brand || "").trim().toLowerCase();
                 const cName = String(cat.name || "").trim().toLowerCase();
                 const title = String(cat.bannerTitle || "").trim().toLowerCase();
+                const subtitle = String(cat.bannerSubtitle || "").trim().toLowerCase();
                 const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
                 const pCat = String(p.category || "").trim().toLowerCase();
                 const pName = String(p.name || "").trim().toLowerCase();
@@ -69,17 +70,22 @@ export const Sportwear: React.FC<SportwearProps> = ({
                 if (isExplicitShoes || isExplicitSocks) return false;
 
                 const isSportwearCat = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat.includes('apparel') || hasClothingSize;
-                
-                // Si el banner es el general de Sportwear
-                const isGenericSportwearBanner = cName === 'sportwear' || cName === 'sportware' || cName === 'ropa' || title === 'sportwear' || title === 'sportware' || !cName;
 
-                const matchesBrand = Boolean(bName && (pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand) || pName.includes(bName)));
-                const matchesCatName = Boolean(cName && (pBrand === cName || pCat === cName || pCat.includes(cName) || cName.includes(pCat) || pName.includes(cName) || cName.includes(pBrand)));
-                const matchesTitle = Boolean(title && (pBrand === title || pCat === title || pName.includes(title) || title.includes(pBrand)));
+                // Coincidencia inteligente entre prenda y banner
+                const brandKeywords = [bName, cName, title, subtitle].filter(Boolean);
+                const matchesBrandOrName = brandKeywords.some(kw => 
+                  pBrand.includes(kw) || kw.includes(pBrand) || 
+                  pName.includes(kw) || kw.includes(pName) ||
+                  pCat.includes(kw) || kw.includes(pCat)
+                );
 
-                const bannerMatches = isGenericSportwearBanner 
-                  ? isSportwearCat 
-                  : (matchesBrand || matchesCatName || matchesTitle || (categories.length === 1 && isSportwearCat));
+                const isGenericSportwear = cName === 'sportwear' || cName === 'sportware' || cName === 'ropa' || title === 'sportwear' || title === 'sportware' || !cName;
+
+                const bannerMatches = isSportwearCat && (
+                  matchesBrandOrName || 
+                  isGenericSportwear ||
+                  categories.length <= 1
+                );
 
                 const isAvailable = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
 
