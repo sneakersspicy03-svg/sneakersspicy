@@ -236,9 +236,15 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const handleSaveProduct = async () => {
     let finalSizes: (string | number)[] = [];
-    if (addType === 'shoes') finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
-    else if (addType === 'sportwear') finalSizes = selectedSportwearSizes;
-    else finalSizes = ['Talla Única'];
+    if (addType === 'shoes') {
+      finalSizes = sizesText.split(',').map(s => s.trim()).filter(s => s !== '');
+    } else if (addType === 'sportwear') {
+      finalSizes = selectedSportwearSizes.length > 0 
+        ? selectedSportwearSizes 
+        : (sizesText ? sizesText.split(',').map(s => s.trim().toUpperCase()).filter(s => s !== '') : ['M', 'L', 'XL']);
+    } else {
+      finalSizes = ['Talla Única'];
+    }
 
     if (!newProduct.name || !newProduct.brand || !newProduct.price || !newProduct.images.front) {
       return alert("⚠️ Faltan datos críticos (Nombre, Marca, Precio y URL Imagen Principal).");

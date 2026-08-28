@@ -15,6 +15,7 @@ interface SportwearProps {
 const FALLBACK_SPORTWEAR_IMAGE = 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=800';
 
 const CLOTHING_SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'];
+const CLOTHING_SIZES_SET = new Set(['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', 'TALLA ÚNICA', 'UNICA', 'ONE SIZE']);
 
 export const Sportwear: React.FC<SportwearProps> = ({ 
   categories, 
@@ -56,25 +57,42 @@ export const Sportwear: React.FC<SportwearProps> = ({
                 const pCat = String(p.category || "").trim().toLowerCase();
                 const pName = String(p.name || "").trim().toLowerCase();
                 
-                // Excluir estrictamente calzado y medias
-                const isNotShoes = !pCat.includes('calzado') && !pCat.includes('tenis') && !pCat.includes('shoe') && !pCat.includes('sneaker') && pCat !== 'shoes';
-                const isNotSocks = !pCat.includes('media') && !pCat.includes('sock') && pCat !== 'medias';
-                const isSportwearCat = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat.includes('apparel') || pCat === cName;
+                const rawSizes: (string | number)[] = Array.isArray(p.availableSizes) 
+                  ? p.availableSizes 
+                  : (Array.isArray((p as any).sizes) ? (p as any).sizes : (typeof p.availableSizes === 'string' ? (p.availableSizes as string).split(',') : []));
+
+                // Detectar si el producto contiene tallas de ropa
+                const hasClothingSize = rawSizes.some(s => CLOTHING_SIZES_SET.has(String(s).trim().toUpperCase()));
+                const isExplicitShoes = (pCat === 'shoes' || pCat === 'calzado' || pCat === 'tenis') && !hasClothingSize;
+                const isExplicitSocks = (pCat === 'medias' || pCat === 'socks') && !hasClothingSize;
+
+                if (isExplicitShoes || isExplicitSocks) return false;
+
+                const isSportwearCat = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat.includes('apparel') || hasClothingSize;
                 
-                const matchesBrand = Boolean(bName && (pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand)));
-                const matchesCatName = Boolean(cName && (pBrand === cName || pCat === cName || pCat.includes(cName) || cName.includes(pCat) || pName.includes(cName)));
-                const matchesTitle = Boolean(title && (pBrand === title || pCat === title || pName.includes(title)));
-                
-                const matches = (matchesBrand || matchesCatName || matchesTitle || (categories.length === 1 && isSportwearCat)) && isNotShoes && isNotSocks;
+                // Si el banner es el general de Sportwear
+                const isGenericSportwearBanner = cName === 'sportwear' || cName === 'sportware' || cName === 'ropa' || title === 'sportwear' || title === 'sportware' || !cName;
+
+                const matchesBrand = Boolean(bName && (pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand) || pName.includes(bName)));
+                const matchesCatName = Boolean(cName && (pBrand === cName || pCat === cName || pCat.includes(cName) || cName.includes(pCat) || pName.includes(cName) || cName.includes(pBrand)));
+                const matchesTitle = Boolean(title && (pBrand === title || pCat === title || pName.includes(title) || title.includes(pBrand)));
+
+                const bannerMatches = isGenericSportwearBanner 
+                  ? isSportwearCat 
+                  : (matchesBrand || matchesCatName || matchesTitle || (categories.length === 1 && isSportwearCat));
+
                 const isAvailable = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
-                
-                return matches && isAvailable;
+
+                return bannerMatches && isAvailable;
               });
 
-              // Extraer sólo tallas con stock real (excluyendo tallas agotadas y tallas numéricas de calzado)
+              // Extraer sólo tallas con stock real (excluyendo tallas agotadas)
               const allAvailableSizes = brandProducts.flatMap(p => {
-                const soldOuts = (p.soldOutSizes || []).map(String);
-                return (p.availableSizes || []).filter(s => !soldOuts.includes(String(s)));
+                const rawSizes: (string | number)[] = Array.isArray(p.availableSizes) 
+                  ? p.availableSizes 
+                  : (Array.isArray((p as any).sizes) ? (p as any).sizes : (typeof p.availableSizes === 'string' ? (p.availableSizes as string).split(',') : []));
+                const soldOuts = ((p.soldOutSizes || (p as any).agotadas || []) as any[]).map(String);
+                return rawSizes.map(s => String(s).trim()).filter(s => s && !soldOuts.includes(s));
               });
 
               // Ordenar tallas lógicamente en formato de ropa
