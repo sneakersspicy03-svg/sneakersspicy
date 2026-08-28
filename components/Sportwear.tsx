@@ -114,8 +114,8 @@ export const Sportwear: React.FC<SportwearProps> = ({
               const formatClass = cat.format === 'vertical' ? 'aspect-[9/16]' : cat.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
               const bannerImg = cat.image || cat.marqueeImage || FALLBACK_SPORTWEAR_IMAGE;
 
-              const targetBrand = cat.brand || cat.name;
-              const targetCategory = cat.name || 'Sportwear';
+              const targetBrand = (cat.brand || cat.name || 'Sportwear').trim();
+              const targetCategory = 'Sportwear';
 
               return (
                 <div

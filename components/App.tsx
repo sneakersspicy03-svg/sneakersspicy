@@ -258,32 +258,43 @@ const App: React.FC = () => {
     return currentProducts.filter(p => {
       const pBrand = String(p.marca || p.brand || '').trim().toLowerCase();
       const pCat = String(p.category || '').trim().toLowerCase();
+      const pName = String(p.name || '').trim().toLowerCase();
       const fBrand = filters.brand ? filters.brand.trim().toLowerCase() : null;
       const fCat = filters.category ? filters.category.trim().toLowerCase() : null;
 
       // 1. Aislamiento Estricto de Sección / Categoría
       if (fCat) {
-        if (fCat.includes('calzado') || fCat.includes('tenis') || fCat.includes('shoe') || fCat.includes('sneaker')) {
+        const isShoeFilter = fCat.includes('calzado') || fCat.includes('tenis') || fCat.includes('shoe') || fCat.includes('sneaker');
+        const isSportwearFilter = fCat.includes('sportwear') || fCat.includes('sportware') || fCat.includes('ropa') || fCat.includes('bermuda') || fCat.includes('licra') || fCat.includes('apparel');
+        const isSocksFilter = fCat.includes('media') || fCat.includes('sock');
+
+        if (isShoeFilter) {
           if (!isShoeProduct(p)) return false;
-        } else if (fCat.includes('sportwear') || fCat.includes('sportware') || fCat.includes('ropa') || fCat.includes('bermuda') || fCat.includes('licra') || fCat.includes('apparel')) {
+        } else if (isSportwearFilter) {
           if (!isSportwearProduct(p) && pCat !== fCat && !pCat.includes(fCat)) return false;
-        } else if (fCat.includes('media') || fCat.includes('sock')) {
+        } else if (isSocksFilter) {
           if (!isSocksProduct(p)) return false;
         } else {
-          if (pCat !== fCat && !pCat.includes(fCat) && !fCat.includes(pCat)) return false;
+          const catMatches = pCat === fCat || pCat.includes(fCat) || fCat.includes(pCat) || pBrand === fCat || fCat.includes(pBrand);
+          if (!catMatches) return false;
         }
       }
 
       // 2. Coincidencia de Marca
       if (fBrand) {
-        const brandMatch = pBrand === fBrand || pBrand.includes(fBrand) || fBrand.includes(pBrand) || String(p.name || '').toLowerCase().includes(fBrand);
+        const brandMatch = pBrand === fBrand || pBrand.includes(fBrand) || fBrand.includes(pBrand) || pName.includes(fBrand);
         if (!brandMatch) return false;
       }
 
-      // 3. Coincidencia de Talla
+      // 3. Coincidencia de Talla (Flexible e insensible a mayúsculas)
       if (filters.size) {
-        const soldOuts = (p.soldOutSizes || []).map(String);
-        const hasSize = (p.availableSizes || []).map(String).includes(String(filters.size)) && !soldOuts.includes(String(filters.size));
+        const targetSize = String(filters.size).trim().toUpperCase();
+        const rawSizes = Array.isArray(p.availableSizes) 
+          ? p.availableSizes 
+          : (Array.isArray((p as any).sizes) ? (p as any).sizes : (typeof p.availableSizes === 'string' ? (p.availableSizes as string).split(',') : []));
+        const soldOuts = ((p.soldOutSizes || (p as any).agotadas || []) as any[]).map(s => String(s).trim().toUpperCase());
+        
+        const hasSize = (rawSizes as any[]).some((s: any) => String(s).trim().toUpperCase() === targetSize && !soldOuts.includes(targetSize));
         if (!hasSize) return false;
       }
 
