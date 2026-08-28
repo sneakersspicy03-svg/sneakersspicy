@@ -18,12 +18,25 @@ const CONDITION_LABELS: Record<ProductCondition, string> = {
 };
 
 const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, product, onClose, onAddToCart }) => {
-  const [activeImage, setActiveImage] = useState<string>(product.images?.front || product.image);
+  const getFrontImage = () => {
+    if (product.images) {
+      if (Array.isArray(product.images)) {
+        const first = product.images.find(url => typeof url === 'string' && url.trim() !== '');
+        if (first) return first;
+      } else if (typeof product.images === 'object') {
+        if (product.images.front) return product.images.front;
+      }
+    }
+    return product.image;
+  };
+
+  const [activeImage, setActiveImage] = useState<string>(() => getFrontImage());
   const [selectedSize, setSelectedSize] = useState<number | string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
 
   useEffect(() => {
+    setActiveImage(getFrontImage());
     if (product.availableSizes && product.availableSizes.length === 1) {
       const singleSize = product.availableSizes[0];
       const isSoldOut = product.isSoldOut || (product.soldOutSizes && product.soldOutSizes.map(String).includes(String(singleSize)));
@@ -37,14 +50,33 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
 
   const SELLER_PHONE = "18299745066"; 
 
-  const galleryImages = product.images ? [
-    { label: 'Frente', url: product.images.front },
-    { label: 'Detrás', url: product.images.back },
-    { label: 'Izquierda', url: product.images.left },
-    { label: 'Derecha', url: product.images.right },
-    { label: 'Arriba', url: product.images.top },
-    { label: 'Abajo', url: product.images.bottom },
-  ].filter(img => img.url) : [{ label: 'Frente', url: product.image }];
+  let galleryImages: { label: string; url: string }[] = [];
+  if (product.images) {
+    if (Array.isArray(product.images)) {
+      galleryImages = product.images
+        .filter((url): url is string => typeof url === 'string' && url.trim() !== '')
+        .map((url, idx) => ({
+          label: `Imagen ${idx + 1}`,
+          url: url
+        }));
+    } else if (typeof product.images === 'object') {
+      const slots = [
+        { label: 'Frente', url: product.images.front },
+        { label: 'Detrás', url: product.images.back },
+        { label: 'Izquierda', url: product.images.left },
+        { label: 'Derecha', url: product.images.right },
+        { label: 'Arriba', url: product.images.top },
+        { label: 'Abajo', url: product.images.bottom },
+      ];
+      galleryImages = slots.filter(img => typeof img.url === 'string' && img.url.trim() !== '') as { label: string; url: string }[];
+    } else if (typeof product.images === 'string' && (product.images as string).trim() !== '') {
+      galleryImages = [{ label: 'Frente', url: product.images }];
+    }
+  }
+
+  if (galleryImages.length === 0 && product.image) {
+    galleryImages = [{ label: 'Frente', url: product.image }];
+  }
 
   const handleAddToCartAction = () => {
     if (!selectedSize) {
@@ -88,7 +120,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
     window.open(waUrl, '_blank');
   };
 
-  const isSportwear = product.category.toLowerCase().includes('bermuda') || product.category.toLowerCase().includes('licra');
+  const isSportwear = product.category.toLowerCase().includes('bermuda') || product.category.toLowerCase().includes('licra') || product.category.toLowerCase().includes('sportwear') || product.category.toLowerCase().includes('sportware') || product.category.toLowerCase().includes('ropa');
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 md:p-10 lg:p-16 animate-fade-in">
@@ -104,6 +136,8 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
           <div className="flex-1 p-2 md:p-8 flex items-center justify-center overflow-hidden touch-pan-y touch-pinch-zoom">
             <img 
               src={activeImage} 
+              crossOrigin="anonymous"
+              loading="eager"
               className="w-full h-full object-contain transition-transform duration-500 hover:scale-110 md:hover:scale-125 drop-shadow-[0_20px_40px_rgba(0,0,0,0.9)] cursor-zoom-in touch-action-pinch-zoom" 
               alt={product.name} 
             />
@@ -115,7 +149,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({ logo, whatsappTemplate, p
                 onClick={() => setActiveImage(img.url)} 
                 className={`w-16 h-16 md:w-14 md:h-14 rounded-2xl md:rounded-xl overflow-hidden border-2 transition-all shrink-0 snap-center ${activeImage === img.url ? 'border-red-600 scale-105 shadow-lg shadow-red-900/40' : 'border-white/5 opacity-40 hover:opacity-100'}`}
               >
-                <img src={img.url} className="w-full h-full object-cover" alt="" />
+                <img src={img.url} crossOrigin="anonymous" loading="eager" className="w-full h-full object-cover" alt="" />
               </button>
             ))}
           </div>

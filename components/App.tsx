@@ -23,7 +23,7 @@ const App: React.FC = () => {
   
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('spicy_cart');
+      const saved = localStorage.getItem('spicy_cart') || localStorage.getItem('base_cart');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
@@ -42,6 +42,12 @@ const App: React.FC = () => {
 
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [whatsappTemplate, setWhatsappTemplate] = useState<string>('¡Hola! Quiero confirmar el siguiente pedido:\n\n[DETALLES]\n\n• TOTAL FINAL: [TOTAL]\n\n¿Tienen disponibilidad para entrega hoy?');
+  const [storeName, setStoreName] = useState<string>('SNEAKERS SPICY');
+  const [primaryColor, setPrimaryColor] = useState<string>('#EF4444');
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--primary-color', primaryColor);
+  }, [primaryColor]);
   const [currentProducts, setCurrentProducts] = useState<Product[]>([]);
   const [currentCategories, setCurrentCategories] = useState<SportwearCategory[]>([]);
   const [currentSections, setCurrentSections] = useState<Section[]>([]);
@@ -61,7 +67,7 @@ const App: React.FC = () => {
           if (!cloudState.sections || cloudState.sections.length === 0) {
             const defaultSections: Omit<Section, 'id'>[] = [
               { name: "Calzado", emoji: "👟", photoCount: 6, sizeInputType: "numeric", orderIndex: 0 },
-              { name: "Sportware", emoji: "👕", photoCount: 2, sizeInputType: "clothing_letters", orderIndex: 1 },
+              { name: "Sportwear", emoji: "👕", photoCount: 2, sizeInputType: "clothing_letters", orderIndex: 1 },
               { name: "Medias", emoji: "🧦", photoCount: 2, sizeInputType: "clothing_letters", orderIndex: 2 }
             ];
             for (const s of defaultSections) {
@@ -78,12 +84,14 @@ const App: React.FC = () => {
           setSocksBrands(cloudState.socksBrands || []);
           setCustomLogo(cloudState.logo);
           if (cloudState.whatsappTemplate) setWhatsappTemplate(cloudState.whatsappTemplate);
+          if (cloudState.storeName) setStoreName(cloudState.storeName);
+          if (cloudState.primaryColor) setPrimaryColor(cloudState.primaryColor);
           if (cloudState.tennisBrands && cloudState.tennisBrands.length > 0) setActiveBrand(cloudState.tennisBrands[0]);
           setCloudOffline(false);
         }
       } catch (e) {
         setCloudOffline(true);
-        const localInv = localStorage.getItem('spicy_inventory');
+        const localInv = localStorage.getItem('spicy_inventory') || localStorage.getItem('base_inventory');
         if (localInv) {
           try {
             const parsed = JSON.parse(localInv);
@@ -93,6 +101,8 @@ const App: React.FC = () => {
             setSocksBrands(parsed.socksBrands || []);
             setCustomLogo(parsed.logo || null);
             if (parsed.whatsappTemplate) setWhatsappTemplate(parsed.whatsappTemplate);
+            if (parsed.storeName) setStoreName(parsed.storeName);
+            if (parsed.primaryColor) setPrimaryColor(parsed.primaryColor);
           } catch (err) {}
         }
       } finally {
@@ -109,9 +119,13 @@ const App: React.FC = () => {
         banners.push({ id: doc.id, ...doc.data() });
       });
 
-      const tBrands = banners.filter(b => b.type === 'tennis');
-      const sBrands = banners.filter(b => b.type === 'socks');
-      const cats = banners.filter(b => b.type === 'sportwear');
+      const isTennis = (b: any) => b.type === 'tennis' || b.type === 'shoes' || b.type === 'calzado' || b.category === 'calzado' || b.category === 'shoes' || b.category === 'tennis' || b.sectionId === 'calzado';
+      const isSocks = (b: any) => b.type === 'socks' || b.type === 'medias' || b.category === 'medias' || b.category === 'socks' || b.sectionId === 'medias';
+      const isSportwear = (b: any) => b.type === 'sportwear' || b.type === 'sportware' || b.type === 'ropa' || b.category === 'sportwear' || b.category === 'sportware' || b.category === 'ropa' || b.sectionId === 'sportwear' || b.sectionId === 'sportware' || (!isTennis(b) && !isSocks(b));
+
+      const tBrands = banners.filter(isTennis);
+      const sBrands = banners.filter(isSocks);
+      const cats = banners.filter(isSportwear);
 
       setTennisBrands(tBrands);
       setSocksBrands(sBrands);
@@ -151,6 +165,8 @@ const App: React.FC = () => {
         socksBrands: updates.socksBrands ?? socksBrands,
         logo: updates.logo ?? customLogo,
         whatsappTemplate: updates.whatsappTemplate ?? whatsappTemplate,
+        storeName: updates.storeName ?? storeName,
+        primaryColor: updates.primaryColor ?? primaryColor,
         lastUpdated: Date.now()
       };
       localStorage.setItem('spicy_inventory', JSON.stringify(newState));
@@ -161,7 +177,7 @@ const App: React.FC = () => {
     } finally {
       setIsPublishing(false);
     }
-  }, [currentProducts, currentCategories, tennisBrands, socksBrands, customLogo, whatsappTemplate]);
+  }, [currentProducts, currentCategories, tennisBrands, socksBrands, customLogo, whatsappTemplate, storeName, primaryColor]);
 
   const handleAddBanner = async (banner: any, type: 'tennis' | 'socks' | 'sportwear') => {
     setIsPublishing(true);
@@ -211,9 +227,9 @@ const App: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     return currentProducts.filter(p => {
-      const bMatch = !filters.brand || p.marca === filters.brand || p.brand === filters.brand;
+      const bMatch = !filters.brand || (p.marca && p.marca.toLowerCase() === filters.brand.toLowerCase()) || (p.brand && p.brand.toLowerCase() === filters.brand.toLowerCase());
       const sMatch = !filters.size || (p.availableSizes && p.availableSizes.map(String).includes(String(filters.size)));
-      const cMatch = !filters.category || p.category === filters.category;
+      const cMatch = !filters.category || p.category === filters.category || (p.category && p.category.toLowerCase() === filters.category.toLowerCase()) || (filters.category.toLowerCase().includes('sportwear') && p.category?.toLowerCase().includes('sportwear'));
       return bMatch && sMatch && cMatch;
     });
   }, [currentProducts, filters]);
@@ -287,60 +303,128 @@ const App: React.FC = () => {
         onOpenCart={() => setIsCartOpen(true)} onOpenTerms={() => setIsTermsOpen(true)} onOpenDev={() => setIsDevPanelOpen(true)}
         onHome={() => { setFilters({ brand: null, size: null, category: null }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
         isDevMode={isDevMode} isAdminAuthorized={isAdminAuthorized} onToggleDevMode={() => setIsDevMode(!isDevMode)}
+        storeName={storeName}
       />
 
       <main className="pb-20">
-        {currentSections.map((section) => {
-          const sectionName = section.name.toLowerCase();
-          
-          if (sectionName.includes('calzado') || sectionName.includes('tenis') || sectionName.includes('shoes')) {
+        {currentSections.length > 0 ? (
+          currentSections.map((section) => {
+            const sectionName = section.name.toLowerCase();
+            
+            if (sectionName.includes('calzado') || sectionName.includes('tenis') || sectionName.includes('shoes')) {
+              return (
+                <Hero 
+                  key={section.id}
+                  title={section.name}
+                  subtitle={section.subtitle}
+                  brands={tennisBrands} 
+                  products={currentProducts} 
+                  onBrandSelect={setActiveBrand} 
+                  activeBrand={activeBrand} 
+                  isDevMode={isDevMode} 
+                  onSelectSize={handleSelectSize} 
+                  onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('shoes'); setIsDevPanelOpen(true); }} 
+                />
+              );
+            }
+
+            if (sectionName.includes('media') || sectionName.includes('socks')) {
+              return (
+                <Socks 
+                  key={section.id}
+                  title={section.name}
+                  subtitle={section.subtitle}
+                  brands={socksBrands} 
+                  products={currentProducts} 
+                  onBrandSelect={(b) => setFilters({ brand: b, size: null, category: section.name })} 
+                  onSelectSize={handleSelectSize} 
+                  isDevMode={isDevMode} 
+                  onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} 
+                />
+              );
+            }
+
+            // Sportwear y cualquier otra categoría dinámica
+            const sectionCategories = currentCategories.filter(c => 
+              (c as any).sectionId === section.id ||
+              c.name === section.name ||
+              (c as any).category === section.name ||
+              sectionName.includes('sportwear') || 
+              sectionName.includes('sportware') || 
+              sectionName.includes('ropa') || 
+              sectionName.includes('prenda') ||
+              sectionName.includes('textil') ||
+              sectionName.includes('apparel') ||
+              currentSections.filter(s => {
+                const sn = s.name.toLowerCase();
+                return !sn.includes('calzado') && !sn.includes('tenis') && !sn.includes('shoes') && !sn.includes('media') && !sn.includes('socks');
+              }).length <= 1
+            );
+
             return (
-              <Hero 
+              <Sportwear 
                 key={section.id}
                 title={section.name}
                 subtitle={section.subtitle}
-                brands={tennisBrands} 
+                categories={sectionCategories.length > 0 ? sectionCategories : currentCategories} 
                 products={currentProducts} 
-                onBrandSelect={setActiveBrand} 
-                activeBrand={activeBrand} 
-                isDevMode={isDevMode} 
-                onSelectSize={handleSelectSize} 
-                onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('shoes'); setIsDevPanelOpen(true); }} 
-              />
-            );
-          }
-
-          if (sectionName.includes('media') || sectionName.includes('socks')) {
-            return (
-              <Socks 
-                key={section.id}
-                title={section.name}
-                subtitle={section.subtitle}
-                brands={socksBrands} 
-                products={currentProducts} 
-                onBrandSelect={(b) => setFilters({ brand: b, size: null, category: section.name })} 
+                onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
                 onSelectSize={handleSelectSize} 
                 isDevMode={isDevMode} 
-                onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} 
+                onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
               />
             );
-          }
-
-          // Por defecto para Sportwear y cualquier otra categoría dinámica
-          return (
+          })
+        ) : (
+          <>
+            <Hero 
+              brands={tennisBrands} 
+              products={currentProducts} 
+              onBrandSelect={setActiveBrand} 
+              activeBrand={activeBrand} 
+              isDevMode={isDevMode} 
+              onSelectSize={handleSelectSize} 
+              onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('shoes'); setIsDevPanelOpen(true); }} 
+            />
             <Sportwear 
-              key={section.id}
-              title={section.name}
-              subtitle={section.subtitle}
-              categories={currentCategories.filter(c => c.name === section.name || sectionName.includes('ropa') || sectionName.includes('sportwear'))} 
+              title="Sportwear"
+              subtitle="Performance Collection"
+              categories={currentCategories} 
               products={currentProducts} 
               onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
               onSelectSize={handleSelectSize} 
               isDevMode={isDevMode} 
               onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
             />
-          );
-        })}
+            <Socks 
+              brands={socksBrands} 
+              products={currentProducts} 
+              onBrandSelect={(b) => setFilters({ brand: b, size: null, category: 'Medias' })} 
+              onSelectSize={handleSelectSize} 
+              isDevMode={isDevMode} 
+              onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} 
+            />
+          </>
+        )}
+
+        {/* Garantizar renderizado de Sportwear si existen banners pero ninguna sección los abarcó */}
+        {currentSections.length > 0 && 
+         !currentSections.some(s => {
+           const sn = s.name.toLowerCase();
+           return !sn.includes('calzado') && !sn.includes('tenis') && !sn.includes('shoes') && !sn.includes('media') && !sn.includes('socks');
+         }) && 
+         currentCategories.length > 0 && (
+          <Sportwear 
+            title="Sportwear"
+            subtitle="Performance Collection"
+            categories={currentCategories} 
+            products={currentProducts} 
+            onCategorySelect={(b, c) => setFilters({brand: b, size: null, category: c})} 
+            onSelectSize={handleSelectSize} 
+            isDevMode={isDevMode} 
+            onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('sportwear'); setIsDevPanelOpen(true); }} 
+          />
+        )}
         
         <section id="product-grid" className="px-4 md:px-20 py-24 scroll-mt-24">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-16">
@@ -378,6 +462,8 @@ const App: React.FC = () => {
       <DeveloperMode 
         logo={customLogo} onUpdateLogo={(l) => { setCustomLogo(l); publishState({ logo: l }); }}
         whatsappTemplate={whatsappTemplate} onUpdateWhatsAppTemplate={(t) => { setWhatsappTemplate(t); publishState({ whatsappTemplate: t }); }}
+        storeName={storeName} onUpdateStoreName={(n) => { setStoreName(n); publishState({ storeName: n }); }}
+        primaryColor={primaryColor} onUpdatePrimaryColor={(c) => { setPrimaryColor(c); publishState({ primaryColor: c }); }}
         isOpen={isDevPanelOpen} onClose={() => { setIsDevPanelOpen(false); setInitialDevBrand(undefined); setInitialDevType(undefined); }}
         products={currentProducts} categories={currentCategories} tennisBrands={tennisBrands} socksBrands={socksBrands}
         sections={currentSections}
@@ -434,13 +520,27 @@ const App: React.FC = () => {
         onAddSection={async ns => {
           setIsPublishing(true);
           try {
-            await syncService.saveSection(ns);
+            const secId = await syncService.saveSection(ns);
+            const newSectionCreated: Section = { ...ns, id: secId };
+            setCurrentSections(prev => {
+              const updated = [...prev, newSectionCreated];
+              return updated.sort((a, b) => a.orderIndex - b.orderIndex);
+            });
+            console.log("🚀 SECCIÓN CREADA EN FIRESTORE CON ID:", secId);
+            alert(`✅ Sección "${ns.name}" creada con éxito.`);
+          } catch (error) {
+            console.error("❌ Error al crear sección:", error);
+            alert("Error al crear la sección.");
           } finally { setIsPublishing(false); }
         }}
         onUpdateSection={async us => {
           setIsPublishing(true);
           try {
             await syncService.updateSection(us.id, us);
+            setCurrentSections(prev => prev.map(s => s.id === us.id ? us : s).sort((a, b) => a.orderIndex - b.orderIndex));
+            console.log("🚀 SECCIÓN ACTUALIZADA:", us.id);
+          } catch (error) {
+            console.error("Error al actualizar sección:", error);
           } finally { setIsPublishing(false); }
         }}
         onDeleteSection={async id => {
@@ -448,6 +548,10 @@ const App: React.FC = () => {
             setIsPublishing(true);
             try {
               await syncService.deleteSection(id);
+              setCurrentSections(prev => prev.filter(s => s.id !== id));
+              console.log("🚀 SECCIÓN ELIMINADA:", id);
+            } catch (e: any) { 
+              console.error("Error al eliminar sección:", e);
             } finally { setIsPublishing(false); }
           }
         }}

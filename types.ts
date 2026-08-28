@@ -70,11 +70,15 @@ export interface SportwearCategory {
   id?: string;
   name: string;
   image: string;
+  marqueeImage?: string;
   brand: string;
+  availableSizes?: (number | string)[];
   bannerTitle?: string;    // Texto en blanco
   bannerSubtitle?: string; // Texto en gris/badge
   type?: 'tennis' | 'socks' | 'sportwear';
   format?: BannerFormat;
+  sectionId?: string;
+  category?: string;
 }
 
 export interface FilterState {
@@ -82,3 +86,4 @@ export interface FilterState {
   size: number | string | null;
   category?: string | null;
 }
+

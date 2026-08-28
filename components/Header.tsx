@@ -11,6 +11,7 @@ interface HeaderProps {
   isDevMode?: boolean;
   isAdminAuthorized?: boolean;
   onToggleDevMode?: () => void;
+  storeName?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -22,8 +23,14 @@ const Header: React.FC<HeaderProps> = ({
   onHome,
   isDevMode = false,
   isAdminAuthorized = false,
-  onToggleDevMode
+  onToggleDevMode,
+  storeName = 'SNEAKERS SPICY'
 }) => {
+  const words = storeName.trim().split(/\s+/);
+  const initials = words.map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'SP';
+  const firstWord = words[0] || 'SNEAKERS';
+  const restWords = words.slice(1).join(' ');
+
   return (
     <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isDevMode ? 'bg-zinc-950/90 border-b border-red-500' : 'bg-black/95 border-b border-white/5'} backdrop-blur-2xl px-4 md:px-8 py-3 flex items-center justify-between`}>
       <div className="flex items-center space-x-2 md:space-x-4">
@@ -36,21 +43,25 @@ const Header: React.FC<HeaderProps> = ({
               src={logo} 
               alt="Logo" 
               className="max-w-full max-h-full object-contain transform group-hover:scale-110 transition-transform duration-300 drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]"
+              crossOrigin="anonymous"
+              loading="eager"
             />
           ) : (
             <div className="text-red-600 font-[1000] text-4xl md:text-5xl tracking-tighter italic transform group-hover:scale-110 transition-transform duration-300 drop-shadow-[0_0_15px_rgba(220,38,38,0.6)]">
-              SP
+              {initials}
             </div>
           )}
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center leading-none select-none">
           <h1 className="text-xl md:text-2xl font-[900] tracking-tighter uppercase text-white">
-            SNEAKERS
+            {firstWord}
           </h1>
-          <h1 className="text-xl md:text-2xl font-[900] tracking-tighter uppercase text-zinc-500 italic md:ml-2">
-            SPICY
-          </h1>
+          {restWords && (
+            <h1 className="text-xl md:text-2xl font-[900] tracking-tighter uppercase text-zinc-500 italic md:ml-2">
+              {restWords}
+            </h1>
+          )}
         </div>
       </div>
 

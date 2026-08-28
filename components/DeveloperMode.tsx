@@ -9,6 +9,10 @@ interface DeveloperModeProps {
   onUpdateLogo: (logo: string | null) => void;
   whatsappTemplate?: string;
   onUpdateWhatsAppTemplate: (t: string) => void;
+  storeName?: string;
+  onUpdateStoreName: (n: string) => void;
+  primaryColor?: string;
+  onUpdatePrimaryColor: (c: string) => void;
   isOpen: boolean;
   onClose: () => void;
   products: Product[];
@@ -54,7 +58,10 @@ interface DeveloperModeProps {
 type AddType = 'shoes' | 'sportwear' | 'socks';
 
 const DeveloperMode: React.FC<DeveloperModeProps> = ({ 
-  logo, onUpdateLogo, whatsappTemplate, onUpdateWhatsAppTemplate, isOpen, onClose, products, categories, tennisBrands, socksBrands, isAuthorized, initialBrand, initialType, onLoginSuccess, onLogout, onAddProduct, onUpdateProduct, onDeleteProduct, onToggleStock, 
+  logo, onUpdateLogo, whatsappTemplate, onUpdateWhatsAppTemplate,
+  storeName = 'SNEAKERS SPICY', onUpdateStoreName,
+  primaryColor = '#EF4444', onUpdatePrimaryColor,
+  isOpen, onClose, products, categories, tennisBrands, socksBrands, isAuthorized, initialBrand, initialType, onLoginSuccess, onLogout, onAddProduct, onUpdateProduct, onDeleteProduct, onToggleStock, 
   onLoadTestData, onClearInventory, onClearBanners,
   onAddTennisBrand, onDeleteTennisBrand, onUpdateTennisBrand,
   onAddSocksBrand, onDeleteSocksBrand, onUpdateSocksBrand,
@@ -105,7 +112,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       const name = selectedSection.name.toLowerCase();
       if (name.includes('calzado') || name.includes('shoes') || name.includes('tenis')) bannerType = 'tennis';
       else if (name.includes('media') || name.includes('socks')) bannerType = 'socks';
-      else if (name.includes('ropa') || name.includes('sportwear') || name.includes('prenda')) bannerType = 'sportwear';
+      else if (name.includes('ropa') || name.includes('sportwear') || name.includes('sportware') || name.includes('prenda')) bannerType = 'sportwear';
       else bannerType = 'tennis'; // Default
     }
 
@@ -119,7 +126,24 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       setDbBrands(Array.from(new Set(names)).filter(Boolean).sort());
     });
     return () => unsubscribe();
-  }, [addType]);
+  }, [addType, selectedSectionId, sections]);
+
+  useEffect(() => {
+    const selectedSection = sections.find(s => s.id === selectedSectionId);
+    if (selectedSection) {
+      const name = selectedSection.name.toLowerCase();
+      if (name.includes('calzado') || name.includes('shoes') || name.includes('tenis')) {
+        setAddType('shoes');
+      } else if (name.includes('media') || name.includes('socks')) {
+        setAddType('socks');
+      } else if (name.includes('ropa') || name.includes('sportwear') || name.includes('sportware') || name.includes('prenda')) {
+        setAddType('sportwear');
+      }
+    }
+    if (!editingProductId) {
+      setNewProduct(prev => ({ ...prev, brand: '' }));
+    }
+  }, [selectedSectionId, sections, editingProductId]);
 
   const resetForm = () => {
     setEditingProductId(null);
@@ -223,8 +247,15 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     const productId = editingProductId || `spicy-${Date.now()}`;
     const selectedSection = sections.find(s => s.id === selectedSectionId);
     
-    // Filtrar solo las imágenes que tienen URL
-    const imagesArray = Object.values(newProduct.images).filter(url => !!url);
+    // Asegurarse de guardar como un objeto plano con strings vacías en los slots no completados
+    const imagesObject = {
+      front: newProduct.images.front || '',
+      back: newProduct.images.back || '',
+      left: newProduct.images.left || '',
+      right: newProduct.images.right || '',
+      top: newProduct.images.top || '',
+      bottom: newProduct.images.bottom || '',
+    };
 
     const productToSave: any = {
       id: productId, 
@@ -237,7 +268,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       sectionId: selectedSectionId,
       availableSizes: finalSizes, 
       image: newProduct.images.front, 
-      images: imagesArray, // Guardar como array para mayor flexibilidad dinámica
+      images: imagesObject,
       stock: newProduct.stock,
       isSoldOut: newProduct.stock === 0
     };
@@ -261,6 +292,23 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       alert(`❌ Error al guardar: ${error.message}`);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveSection = async (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    try {
+      if (editingSection) {
+        await onUpdateSection({ ...editingSection, ...newSectionData });
+        setEditingSection(null);
+      } else {
+        await onAddSection({ ...newSectionData, orderIndex: sections.length });
+      }
+      setShowAddSectionForm(false);
+      setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
+    } catch (err: any) {
+      console.error("❌ Error en handleSaveSection:", err);
+      alert(`Error al guardar sección: ${err.message}`);
     }
   };
 
@@ -419,6 +467,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                       <input placeholder="Modelo" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold" />
                       <select 
+                        required
                         value={newProduct.brand} 
                         onChange={e => setNewProduct({...newProduct, brand: e.target.value})} 
                         className="bg-zinc-900 border border-white/10 p-4 rounded-xl text-xs font-bold text-white appearance-none cursor-pointer hover:border-red-600/50 transition-colors"
@@ -696,16 +745,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   </div>
                   <div className="flex space-x-4 pt-4">
                     <button 
-                      onClick={async () => {
-                        if (editingSection) {
-                          await onUpdateSection({ ...editingSection, ...newSectionData });
-                          setEditingSection(null);
-                        } else {
-                          await onAddSection({ ...newSectionData, orderIndex: sections.length });
-                        }
-                        setShowAddSectionForm(false);
-                        setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
-                      }} 
+                      onClick={handleSaveSection} 
                       className="flex-1 bg-white text-black py-4 rounded-xl font-black text-[10px] uppercase hover:bg-red-600 hover:text-white transition-all shadow-xl"
                     >
                       {editingSection ? 'Guardar Cambios' : 'Crear Sección'}
@@ -781,6 +821,59 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                   <button onClick={onClearBanners} className="w-full mt-2 py-4 bg-red-600/20 border border-red-500/30 text-red-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">
                     🗑️ Borrar Todos los Banners
                   </button>
+                </div>
+              </div>
+
+              {/* Personalización Dinámica de Tema y Marca */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12 bg-zinc-900/30 p-10 rounded-[3rem] border border-white/5 mt-8">
+                <div className="space-y-6">
+                  <label className="text-[11px] font-[1000] text-zinc-500 uppercase tracking-[0.3em] block">Nombre de la Tienda</label>
+                  <input 
+                    type="text" 
+                    value={storeName} 
+                    onChange={(e) => onUpdateStoreName(e.target.value)} 
+                    placeholder="Nombre de la Tienda..." 
+                    className="w-full bg-black border border-white/10 p-5 rounded-2xl text-xs font-bold text-white animate-scale-in" 
+                  />
+                  <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Fallback por defecto: SNEAKERS SPICY</p>
+                </div>
+
+                <div className="space-y-6">
+                  <label className="text-[11px] font-[1000] text-zinc-500 uppercase tracking-[0.3em] block">Color de Acento Cromático</label>
+                  <div className="flex items-center space-x-6">
+                    <input 
+                      type="color" 
+                      value={primaryColor} 
+                      onChange={(e) => onUpdatePrimaryColor(e.target.value)} 
+                      className="w-16 h-16 bg-transparent border-0 cursor-pointer rounded-2xl overflow-hidden shrink-0 shadow-2xl" 
+                    />
+                    <div className="flex-1">
+                      <div className="text-xs font-black text-white mb-1 uppercase tracking-wider">{primaryColor}</div>
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-widest">Tematiza botones, bordes y textos en tiempo real</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase text-zinc-500 tracking-wider">Colores Rápidos</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { name: 'Rojo Spicy', value: '#EF4444' },
+                        { name: 'Azul', value: '#3B82F6' },
+                        { name: 'Verde', value: '#10B981' },
+                        { name: 'Violeta', value: '#8B5CF6' },
+                        { name: 'Naranja', value: '#F97316' }
+                      ].map((c) => (
+                        <button
+                          key={c.value}
+                          onClick={() => onUpdatePrimaryColor(c.value)}
+                          style={{ borderColor: c.value }}
+                          className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase border transition-all hover:scale-105 active:scale-95 ${primaryColor.toLowerCase() === c.value.toLowerCase() ? 'bg-zinc-800 text-white shadow-lg' : 'bg-black text-zinc-500 hover:text-white'}`}
+                        >
+                          <span className="inline-block w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: c.value }} />
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

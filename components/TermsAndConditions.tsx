@@ -91,8 +91,7 @@ const TermsAndConditions: React.FC<TermsAndConditionsProps> = ({ logo, isOpen, o
             ) : (
               <div className="text-zinc-600 font-[1000] text-3xl italic tracking-tighter">SP</div>
             )}
-            <p className="text-[8px] font-black uppercase tracking-[0.4em] text-center">Sneakers Spicy © 2025 | Elite Footwear Boutique</p>
-          </div>
+            <p className="text-[8px] font-black uppercase tracking-[0.4em] text-center">Sneakers Spicy © 2025 | Elite Footwear Boutique</p>          </div>
         </div>
 
         <div className="p-6 border-t border-white/10 bg-black">

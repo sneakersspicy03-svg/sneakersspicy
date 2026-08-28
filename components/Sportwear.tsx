@@ -12,8 +12,10 @@ interface SportwearProps {
   subtitle?: string;
 }
 
+const FALLBACK_SPORTWEAR_IMAGE = 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=800';
+
 const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false, title, subtitle }) => {
-  if (!categories || !Array.isArray(categories)) return null;
+  if (!categories || !Array.isArray(categories) || categories.length === 0) return null;
 
   return (
     <div className="relative w-full overflow-hidden flex flex-col bg-[#050505] py-24 transition-all duration-700">
@@ -32,28 +34,35 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {categories.map((cat, index) => {
               const brandName = (cat.brand || 'Nike').toUpperCase();
-              const title = cat.bannerTitle || cat.name;
+              const bannerTitle = cat.bannerTitle || cat.name;
 
-              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible y flexible
+              // Calcular tallas dinámicas - Filtro por marca y categoría
               const brandProducts = products.filter(p => {
                 const bName = String(cat.brand || "").trim().toLowerCase();
                 const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
                 const pCat = String(p.category || "").trim().toLowerCase();
                 const cName = String(cat.name || "").trim().toLowerCase();
-                return pBrand === bName && pCat === cName && !p.isSoldOut;
+                return pBrand === bName && (pCat === cName || pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa')) && !p.isSoldOut;
               });
-              const allSizes = brandProducts.flatMap(p => p.availableSizes);
+              const allSizes = brandProducts.flatMap(p => p.availableSizes || []);
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
+              const displaySizes = dynamicSizes.length > 0 ? dynamicSizes : (cat.availableSizes && cat.availableSizes.length > 0 ? cat.availableSizes : ['S', 'M', 'L', 'XL', 'XXL']);
 
               const formatClass = cat.format === 'vertical' ? 'aspect-[9/16]' : cat.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
+              const bannerImg = cat.image || cat.marqueeImage || FALLBACK_SPORTWEAR_IMAGE;
 
               return (
                 <div
-                  key={index}
+                  key={cat.id || index}
                   onClick={() => onCategorySelect(cat.brand || 'Nike', cat.name)}
                   className={`relative ${formatClass} rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
                 >
-                  <img src={cat.image} alt={title} className="w-full h-full object-cover transition-transform duration-[2500ms] group-hover:scale-110" />
+                  <img 
+                    src={bannerImg} 
+                    alt={bannerTitle} 
+                    onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_SPORTWEAR_IMAGE; }}
+                    className="w-full h-full object-cover transition-transform duration-[2500ms] group-hover:scale-110" 
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/10 to-transparent"></div>
                   
                   {/* Badge Rojo y Textos */}
@@ -63,7 +72,7 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
                     </div>
                     <div className="flex flex-col items-start text-left w-full origin-left">
                       {cat.bannerSubtitle && <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-white/40 mb-1 italic">{cat.bannerSubtitle}</span>}
-                      <h3 className="text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white leading-[0.85]">{title}</h3>
+                      <h3 className="text-3xl sm:text-4xl md:text-5xl font-black italic uppercase tracking-tighter text-white leading-[0.85]">{bannerTitle}</h3>
                     </div>
                   </div>
 
@@ -74,7 +83,7 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
                           <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">Seleccionar Talla</p>
                         </div>
                         <div className="grid grid-cols-3 gap-3">
-                          {dynamicSizes.map(size => (
+                          {displaySizes.map(size => (
                             <button key={size} onClick={(e) => { e.stopPropagation(); onSelectSize?.(cat.brand || 'Nike', String(size), cat.name); }} className="aspect-square rounded-2xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white transition-all text-sm font-black italic">{size}</button>
                           ))}
                           {isDevMode && (

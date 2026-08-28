@@ -56,6 +56,8 @@ export interface GlobalState {
   socksBrands: BrandStock[];
   logo: string | null;
   whatsappTemplate?: string;
+  storeName?: string;
+  primaryColor?: string;
   lastUpdated: number;
 }
 
@@ -165,11 +167,14 @@ export const syncService = {
 
   // SECTIONS CRUD
   saveSection: async (section: Omit<Section, 'id'>): Promise<string> => {
-    const docRef = await addDoc(collection(db, "sections"), {
+    const secId = `sec-${Date.now()}`;
+    const docRef = doc(db, "sections", secId);
+    await setDoc(docRef, {
       ...section,
+      id: secId,
       lastUpdated: Date.now()
     });
-    return docRef.id;
+    return secId;
   },
 
   updateSection: async (id: string, section: Partial<Section>): Promise<void> => {
@@ -207,7 +212,7 @@ export const syncService = {
 
   fetchState: async (): Promise<GlobalState | null> => {
     try {
-      const configRef = doc(db, "config", "global_state");
+      const configRef = doc(db, "ajustes", "apariencia");
       const configSnap = await getDoc(configRef);
       const productsSnap = await getDocs(collection(db, "productos"));
       const productsList: Product[] = [];
@@ -224,24 +229,32 @@ export const syncService = {
       const bannersList = await syncService.getBanners();
       const sectionsList = await syncService.getSections();
 
+      const isTennis = (b: any) => b.type === 'tennis' || b.type === 'shoes' || b.type === 'calzado' || b.category === 'calzado' || b.category === 'shoes' || b.category === 'tennis' || b.sectionId === 'calzado';
+      const isSocks = (b: any) => b.type === 'socks' || b.type === 'medias' || b.category === 'medias' || b.category === 'socks' || b.sectionId === 'medias';
+      const isSportwear = (b: any) => b.type === 'sportwear' || b.type === 'sportware' || b.type === 'ropa' || b.category === 'sportwear' || b.category === 'sportware' || b.category === 'ropa' || b.sectionId === 'sportwear' || b.sectionId === 'sportware' || (!isTennis(b) && !isSocks(b));
+
+      const tennisBanners = bannersList.filter(isTennis);
+      const socksBanners = bannersList.filter(isSocks);
+      const sportwearBanners = bannersList.filter(isSportwear);
+
       if (configSnap.exists()) {
         const configData = configSnap.data();
         return {
           ...configData,
           products: productsList,
           sections: sectionsList,
-          tennisBrands: bannersList.filter(b => b.type === 'tennis'),
-          socksBrands: bannersList.filter(b => b.type === 'socks'),
-          categories: bannersList.filter(b => b.type === 'sportwear'),
+          tennisBrands: tennisBanners,
+          socksBrands: socksBanners,
+          categories: sportwearBanners,
           lastUpdated: configData.lastUpdated || Date.now()
         } as GlobalState;
       }
       return { 
         products: productsList, 
         sections: sectionsList,
-        categories: bannersList.filter(b => b.type === 'sportwear'), 
-        tennisBrands: bannersList.filter(b => b.type === 'tennis'), 
-        socksBrands: bannersList.filter(b => b.type === 'socks'), 
+        categories: sportwearBanners, 
+        tennisBrands: tennisBanners, 
+        socksBrands: socksBanners, 
         logo: null, 
         lastUpdated: Date.now() 
       };
@@ -252,7 +265,7 @@ export const syncService = {
 
   pushState: async (state: GlobalState): Promise<boolean> => {
     try {
-      const docRef = doc(db, "config", "global_state");
+      const docRef = doc(db, "ajustes", "apariencia");
       const { products, categories, sections, tennisBrands, socksBrands, ...restOfState } = state;
       await setDoc(docRef, { ...restOfState, lastUpdated: Date.now() });
       return true;
