@@ -257,6 +257,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       bottom: newProduct.images.bottom || '',
     };
 
+    const resolvedCategory = selectedSection?.name || 
+      (addType === 'shoes' ? 'Shoes' : addType === 'sportwear' ? 'Sportwear' : 'Medias');
+
     const productToSave: any = {
       id: productId, 
       name: newProduct.name, 
@@ -264,8 +267,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       marca: newProduct.brand, 
       price: newProduct.price, 
       description: newProduct.description, 
-      category: selectedSection?.name || newProduct.category,
-      sectionId: selectedSectionId,
+      category: resolvedCategory,
+      sectionId: selectedSectionId || (addType === 'shoes' ? 'calzado' : addType === 'sportwear' ? 'sportwear' : 'medias'),
       availableSizes: finalSizes, 
       image: newProduct.images.front, 
       images: imagesObject,

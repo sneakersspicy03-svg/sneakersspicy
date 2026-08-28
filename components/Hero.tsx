@@ -9,7 +9,7 @@ interface HeroProps {
   activeBrand: BrandStock | null;
   isDevMode?: boolean;
   onQuickAdd?: (brandName: string) => void;
-  onSelectSize?: (brand: string, size: number | string) => void;
+  onSelectSize?: (brand: string, size: number | string, category?: string) => void;
   title?: string;
   subtitle?: string;
 }
@@ -49,13 +49,23 @@ const Hero: React.FC<HeroProps> = ({
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
-              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible a mayúsculas y flexible en campos
+              // Calcular tallas dinámicas - Estricto a Calzado
               const brandProducts = products.filter(p => {
                 const brandName = String((brand as any).nombre || brand.name || "").trim().toLowerCase();
                 const prodMarca = String(p.marca || p.brand || "").trim().toLowerCase();
-                return prodMarca === brandName && !p.isSoldOut;
+                const pCat = String(p.category || "").trim().toLowerCase();
+                
+                const isShoe = (pCat.includes('calzado') || pCat.includes('tenis') || pCat.includes('shoe') || pCat.includes('sneaker') || pCat === 'shoes') &&
+                               !pCat.includes('sportwear') && !pCat.includes('sportware') && !pCat.includes('ropa') && !pCat.includes('media') && !pCat.includes('sock') && !pCat.includes('bermuda') && !pCat.includes('licra');
+                const matchesBrand = prodMarca === brandName || prodMarca.includes(brandName) || brandName.includes(prodMarca);
+                const isAvailable = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
+                
+                return matchesBrand && isShoe && isAvailable;
               });
-              const allSizes = brandProducts.flatMap(p => p.availableSizes);
+              const allSizes = brandProducts.flatMap(p => {
+                const soldOuts = (p.soldOutSizes || []).map(String);
+                return (p.availableSizes || []).filter(s => !soldOuts.includes(String(s)));
+              });
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => Number(a) - Number(b));
 
               const formatClass = brand.format === 'vertical' ? 'aspect-[9/16]' : brand.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
@@ -88,7 +98,7 @@ const Hero: React.FC<HeroProps> = ({
                         {dynamicSizes.map(size => (
                           <button 
                             key={size}
-                            onClick={(e) => { e.stopPropagation(); onSelectSize?.(brand.name, size); }}
+                            onClick={(e) => { e.stopPropagation(); onSelectSize?.(brand.name, size, 'Calzado'); }}
                             className="aspect-square rounded-xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all text-[11px] font-black italic z-10"
                           >
                             {size}

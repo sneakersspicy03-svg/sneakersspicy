@@ -32,13 +32,21 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
-              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible y flexible
+              // Calcular tallas dinámicas - Estricto a Medias
               const brandProducts = products.filter(p => {
                 const bName = String((brand as any).nombre || brand.name || "").trim().toLowerCase();
                 const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
-                return pBrand === bName && p.category === 'Medias' && !p.isSoldOut;
+                const pCat = String(p.category || "").trim().toLowerCase();
+                const isSocks = (pCat.includes('media') || pCat.includes('sock') || pCat === 'medias') &&
+                                !pCat.includes('calzado') && !pCat.includes('tenis') && !pCat.includes('shoes') && !pCat.includes('sportwear');
+                const matchesBrand = pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand);
+                const isAvailable = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
+                return matchesBrand && isSocks && isAvailable;
               });
-              const allSizes = brandProducts.flatMap(p => p.availableSizes);
+              const allSizes = brandProducts.flatMap(p => {
+                const soldOuts = (p.soldOutSizes || []).map(String);
+                return (p.availableSizes || []).filter(s => !soldOuts.includes(String(s)));
+              });
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 
               const formatClass = brand.format === 'vertical' ? 'aspect-[9/16]' : brand.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';

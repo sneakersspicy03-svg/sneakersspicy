@@ -56,24 +56,28 @@ export const Sportwear: React.FC<SportwearProps> = ({
                 const pCat = String(p.category || "").trim().toLowerCase();
                 const pName = String(p.name || "").trim().toLowerCase();
                 
-                const matchesBrand = Boolean(bName && (pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand) || pName.includes(bName)));
+                // Excluir estrictamente calzado y medias
+                const isNotShoes = !pCat.includes('calzado') && !pCat.includes('tenis') && !pCat.includes('shoe') && !pCat.includes('sneaker') && pCat !== 'shoes';
+                const isNotSocks = !pCat.includes('media') && !pCat.includes('sock') && pCat !== 'medias';
+                const isSportwearCat = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat.includes('apparel') || pCat === cName;
+                
+                const matchesBrand = Boolean(bName && (pBrand === bName || pBrand.includes(bName) || bName.includes(pBrand)));
                 const matchesCatName = Boolean(cName && (pBrand === cName || pCat === cName || pCat.includes(cName) || cName.includes(pCat) || pName.includes(cName)));
                 const matchesTitle = Boolean(title && (pBrand === title || pCat === title || pName.includes(title)));
-                const isGeneralSportwear = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra');
                 
-                const matches = matchesBrand || matchesCatName || matchesTitle || (categories.length === 1 && isGeneralSportwear);
+                const matches = (matchesBrand || matchesCatName || matchesTitle || (categories.length === 1 && isSportwearCat)) && isNotShoes && isNotSocks;
                 const isAvailable = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
                 
                 return matches && isAvailable;
               });
 
-              // Extraer sólo tallas con stock real
+              // Extraer sólo tallas con stock real (excluyendo tallas agotadas y tallas numéricas de calzado)
               const allAvailableSizes = brandProducts.flatMap(p => {
                 const soldOuts = (p.soldOutSizes || []).map(String);
                 return (p.availableSizes || []).filter(s => !soldOuts.includes(String(s)));
               });
 
-              // Ordenar tallas lógicamente
+              // Ordenar tallas lógicamente en formato de ropa
               const dynamicSizes = Array.from(new Set(allAvailableSizes)).sort((a, b) => {
                 const idxA = CLOTHING_SIZE_ORDER.indexOf(String(a).toUpperCase());
                 const idxB = CLOTHING_SIZE_ORDER.indexOf(String(b).toUpperCase());

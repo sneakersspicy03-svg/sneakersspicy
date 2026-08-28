@@ -15,6 +15,24 @@ import TermsAndConditions from './TermsAndConditions';
 import DeveloperMode from './DeveloperMode';
 import AIConsultant from './AIConsultant';
 
+const isShoeProduct = (p: Product) => {
+  const c = String(p.category || '').toLowerCase();
+  return (c === 'shoes' || c === 'calzado' || c === 'tenis' || c.includes('calzado') || c.includes('tenis') || c.includes('shoes') || c.includes('sneaker')) &&
+         !c.includes('sportwear') && !c.includes('sportware') && !c.includes('ropa') && !c.includes('media') && !c.includes('sock') && !c.includes('bermuda') && !c.includes('licra');
+};
+
+const isSportwearProduct = (p: Product) => {
+  const c = String(p.category || '').toLowerCase();
+  return (c === 'sportwear' || c === 'sportware' || c === 'ropa' || c.includes('sportwear') || c.includes('sportware') || c.includes('ropa') || c.includes('bermuda') || c.includes('licra') || c.includes('apparel') || c.includes('prenda') || c.includes('textil')) &&
+         !c.includes('calzado') && !c.includes('tenis') && !c.includes('shoes') && !c.includes('sneaker') && !c.includes('media') && !c.includes('sock');
+};
+
+const isSocksProduct = (p: Product) => {
+  const c = String(p.category || '').toLowerCase();
+  return (c === 'medias' || c === 'socks' || c.includes('media') || c.includes('sock')) &&
+         !c.includes('calzado') && !c.includes('tenis') && !c.includes('shoes') && !c.includes('sportwear') && !c.includes('ropa');
+};
+
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -243,31 +261,33 @@ const App: React.FC = () => {
       const fBrand = filters.brand ? filters.brand.trim().toLowerCase() : null;
       const fCat = filters.category ? filters.category.trim().toLowerCase() : null;
 
-      let bMatch = true;
-      if (fBrand) {
-        bMatch = pBrand === fBrand || pBrand.includes(fBrand) || fBrand.includes(pBrand);
-      }
-
-      let cMatch = true;
+      // 1. Aislamiento Estricto de Sección / Categoría
       if (fCat) {
-        if (fCat.includes('sportwear') || fCat.includes('sportware') || fCat.includes('ropa') || fCat.includes('bermuda') || fCat.includes('licra')) {
-          cMatch = pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat === fCat;
+        if (fCat.includes('calzado') || fCat.includes('tenis') || fCat.includes('shoe') || fCat.includes('sneaker')) {
+          if (!isShoeProduct(p)) return false;
+        } else if (fCat.includes('sportwear') || fCat.includes('sportware') || fCat.includes('ropa') || fCat.includes('bermuda') || fCat.includes('licra') || fCat.includes('apparel')) {
+          if (!isSportwearProduct(p) && pCat !== fCat && !pCat.includes(fCat)) return false;
+        } else if (fCat.includes('media') || fCat.includes('sock')) {
+          if (!isSocksProduct(p)) return false;
         } else {
-          cMatch = pCat === fCat || pCat.includes(fCat) || fCat.includes(pCat);
+          if (pCat !== fCat && !pCat.includes(fCat) && !fCat.includes(pCat)) return false;
         }
       }
 
-      let sMatch = true;
-      if (filters.size) {
-        const soldOuts = (p.soldOutSizes || []).map(String);
-        sMatch = (p.availableSizes || []).map(String).includes(String(filters.size)) && !soldOuts.includes(String(filters.size));
+      // 2. Coincidencia de Marca
+      if (fBrand) {
+        const brandMatch = pBrand === fBrand || pBrand.includes(fBrand) || fBrand.includes(pBrand) || String(p.name || '').toLowerCase().includes(fBrand);
+        if (!brandMatch) return false;
       }
 
-      const isBannerMatching = (fBrand && fCat) 
-        ? (bMatch && cMatch) || (pBrand === fBrand) || (pCat === fCat) || (pBrand === fCat)
-        : (bMatch && cMatch);
+      // 3. Coincidencia de Talla
+      if (filters.size) {
+        const soldOuts = (p.soldOutSizes || []).map(String);
+        const hasSize = (p.availableSizes || []).map(String).includes(String(filters.size)) && !soldOuts.includes(String(filters.size));
+        if (!hasSize) return false;
+      }
 
-      return isBannerMatching && sMatch;
+      return true;
     });
   }, [currentProducts, filters]);
 
@@ -336,7 +356,11 @@ const App: React.FC = () => {
                   subtitle={section.subtitle}
                   brands={tennisBrands} 
                   products={currentProducts} 
-                  onBrandSelect={setActiveBrand} 
+                  onBrandSelect={(b) => {
+                    setActiveBrand(b);
+                    setFilters({ brand: b.name, size: null, category: 'Calzado' });
+                    document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+                  }} 
                   activeBrand={activeBrand} 
                   isDevMode={isDevMode} 
                   onSelectSize={handleSelectSize} 
@@ -353,7 +377,10 @@ const App: React.FC = () => {
                   subtitle={section.subtitle}
                   brands={socksBrands} 
                   products={currentProducts} 
-                  onBrandSelect={(b) => setFilters({ brand: b, size: null, category: section.name })} 
+                  onBrandSelect={(b) => {
+                    setFilters({ brand: b, size: null, category: 'Medias' });
+                    document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+                  }} 
                   onSelectSize={handleSelectSize} 
                   isDevMode={isDevMode} 
                   onQuickAdd={(b) => { setInitialDevBrand(b); setInitialDevType('socks'); setIsDevPanelOpen(true); }} 
@@ -386,7 +413,7 @@ const App: React.FC = () => {
                 categories={sectionCategories.length > 0 ? sectionCategories : currentCategories} 
                 products={currentProducts} 
                 onCategorySelect={(b, c) => {
-                  setFilters({brand: b, size: null, category: c});
+                  setFilters({brand: b, size: null, category: 'Sportwear'});
                   document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
                 }} 
                 onSelectSize={handleSelectSize} 
@@ -400,7 +427,11 @@ const App: React.FC = () => {
             <Hero 
               brands={tennisBrands} 
               products={currentProducts} 
-              onBrandSelect={setActiveBrand} 
+              onBrandSelect={(b) => {
+                setActiveBrand(b);
+                setFilters({ brand: b.name, size: null, category: 'Calzado' });
+                document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }} 
               activeBrand={activeBrand} 
               isDevMode={isDevMode} 
               onSelectSize={handleSelectSize} 
@@ -412,7 +443,7 @@ const App: React.FC = () => {
               categories={currentCategories} 
               products={currentProducts} 
               onCategorySelect={(b, c) => {
-                setFilters({brand: b, size: null, category: c});
+                setFilters({brand: b, size: null, category: 'Sportwear'});
                 document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
               }} 
               onSelectSize={handleSelectSize} 
@@ -446,7 +477,7 @@ const App: React.FC = () => {
             categories={currentCategories} 
             products={currentProducts} 
             onCategorySelect={(b, c) => {
-              setFilters({brand: b, size: null, category: c});
+              setFilters({brand: b, size: null, category: 'Sportwear'});
               document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
             }} 
             onSelectSize={handleSelectSize} 
