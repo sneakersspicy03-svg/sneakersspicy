@@ -8,11 +8,12 @@ Aplicación móvil oficial de **Sneakers Spicy** desarrollada con React, TypeScr
 
 Puedes descargar la última versión de la aplicación directamente sin necesidad de usar memorias USB:
 
-[![Descargar APK](https://img.shields.io/badge/Descargar-APK%20Directo-red?style=for-the-badge&logo=android)](https://sneakers-spicy-db.web.app/sneakers-spicy.apk)
+[![Descargar APK](https://img.shields.io/badge/Descargar-APK%20Directo-red?style=for-the-badge&logo=android)](https://raw.githubusercontent.com/sneakersspicy03-svg/sneakers-spicy-releases/main/sneakers-spicy.apk)
 
-- **Enlace Directo CDN:** [https://sneakers-spicy-db.web.app/sneakers-spicy.apk](https://sneakers-spicy-db.web.app/sneakers-spicy.apk)
+- **Enlace Directo de Descarga:** [https://raw.githubusercontent.com/sneakersspicy03-svg/sneakers-spicy-releases/main/sneakers-spicy.apk](https://raw.githubusercontent.com/sneakersspicy03-svg/sneakers-spicy-releases/main/sneakers-spicy.apk)
+- **Repositorio Público de Lanzamientos:** [sneakers-spicy-releases](https://github.com/sneakersspicy03-svg/sneakers-spicy-releases)
 - **Versión Actual:** `v2.0.0` (Build 2)
-- **Tamaño:** ~6.36 MB
+- **Tamaño:** ~11.4 MB
 
 ---
 
