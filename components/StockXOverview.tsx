@@ -42,37 +42,37 @@ const StockXOverview: React.FC<StockXOverviewProps> = ({
 
   const recommendedProducts = products.slice(0, 8);
 
-  // Categorías visuales para "Shop by Category" al estilo StockX
-  const categoryTiles = [
-    {
-      id: 'sneakers',
-      title: 'Sneakers',
-      name: 'Calzado',
-      image: sneakerProducts[0]?.image || 'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&q=80&w=600',
-      count: sneakerProducts.length || products.length
-    },
-    {
-      id: 'apparel',
-      title: 'Apparel',
-      name: 'Sportwear',
-      image: apparelProducts[0]?.image || 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=600',
-      count: apparelProducts.length
-    },
-    {
-      id: 'socks',
-      title: 'Socks',
-      name: 'Medias',
-      image: socksProducts[0]?.image || 'https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?auto=format&fit=crop&q=80&w=600',
-      count: socksProducts.length
-    },
-    {
-      id: 'all',
-      title: 'Ver Todo',
-      name: '',
-      image: products[1]?.image || products[0]?.image || 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?auto=format&fit=crop&q=80&w=600',
-      count: products.length
+  // Categorías visuales dinámicas desde 'sections' de Firestore
+  const categoryTiles = (sections && sections.length > 0 ? sections : [
+    { id: 'sec-calzado', name: 'Calzado', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' as const, orderIndex: 0 },
+    { id: 'sec-sportwear', name: 'Sportwear', emoji: '👕', photoCount: 2, sizeInputType: 'clothing_letters' as const, orderIndex: 1 },
+    { id: 'sec-medias', name: 'Medias', emoji: '🧦', photoCount: 2, sizeInputType: 'clothing_letters' as const, orderIndex: 2 },
+  ]).map(sec => {
+    let img = sec.imageUrl || '';
+    if (!img) {
+      const secName = sec.name.toLowerCase();
+      const match = products.find(p => {
+        if (p.sectionId && p.sectionId === sec.id) return true;
+        const pCat = (p.category || '').toLowerCase();
+        return pCat === secName || pCat.includes(secName) || secName.includes(pCat);
+      });
+      img = match?.image || '';
     }
-  ];
+    const count = products.filter(p => {
+      if (p.sectionId && p.sectionId === sec.id) return true;
+      const pCat = (p.category || '').toLowerCase();
+      return pCat === sec.name.toLowerCase() || pCat.includes(sec.name.toLowerCase()) || sec.name.toLowerCase().includes(pCat);
+    }).length;
+
+    return {
+      id: sec.id,
+      title: sec.name,
+      name: sec.name,
+      emoji: sec.emoji || '👟',
+      image: img,
+      count: count || products.length
+    };
+  });
 
   // Componente de Tarjeta de Producto estilo StockX (Exacto al diseño de la imagen)
   const StockXCard: React.FC<{ product: Product }> = ({ product }) => {
@@ -190,11 +190,17 @@ const StockXOverview: React.FC<StockXOverviewProps> = ({
               className="group bg-zinc-950/80 rounded-2xl md:rounded-3xl border border-white/5 hover:border-red-600/50 p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 active:scale-95 hover:shadow-xl hover:shadow-red-950/20"
             >
               <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl bg-zinc-900/50 flex items-center justify-center p-2 mb-3 overflow-hidden border border-white/5 group-hover:border-red-600/30">
-                <img 
-                  src={tile.image} 
-                  alt={tile.title} 
-                  className="w-full h-full object-contain transform group-hover:scale-115 transition-transform duration-500" 
-                />
+                {tile.image ? (
+                  <img 
+                    src={tile.image} 
+                    alt={tile.title} 
+                    className="w-full h-full object-contain transform group-hover:scale-115 transition-transform duration-500" 
+                  />
+                ) : (
+                  <span className="text-4xl select-none group-hover:scale-115 transition-transform duration-300">
+                    {tile.emoji}
+                  </span>
+                )}
               </div>
               <span className="text-sm font-black uppercase text-white group-hover:text-red-500 transition-colors tracking-tight">
                 {tile.title}

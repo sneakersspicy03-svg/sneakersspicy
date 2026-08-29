@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { sanitizeSearchQuery } from '../services/securityUtils';
 
 interface HeaderProps {
   logo?: string | null;
@@ -88,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => onSearchChange?.(e.target.value)}
+              onChange={(e) => onSearchChange?.(sanitizeSearchQuery(e.target.value))}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
               placeholder="Search for brand, color, etc."

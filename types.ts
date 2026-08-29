@@ -17,6 +17,7 @@ export interface Section {
   name: string;
   subtitle?: string;
   emoji: string;
+  imageUrl?: string;
   orderIndex: number;
   photoCount: number; // 1-6
   sizeInputType: SizeInputType;

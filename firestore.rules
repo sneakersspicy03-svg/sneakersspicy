@@ -1,8 +1,53 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidProduct(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 150
+          && data.brand is string && data.brand.size() > 0 && data.brand.size() <= 100
+          && data.price is number && data.price > 0
+          && (data.stock == null || (data.stock is number && data.stock >= 0));
+    }
+
+    function isValidBanner(data) {
+      return (data.name is string || data.bannerTitle is string)
+          && (data.image is string || data.marqueeImage is string);
+    }
+
+    // 1. Productos Collection: Public Read, Authenticated & Schema-Validated Write
+    match /productos/{productId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    // 2. Banners Collection: Public Read, Authenticated Write
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && isValidBanner(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    // 3. Sections Collection: Public Read, Authenticated Write
+    match /sections/{sectionId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // 4. Ajustes / Apariencia Collection: Public Read, Authenticated Write
+    match /ajustes/{documentId} {
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // 5. Default Fallback: Deny everything else
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 
 interface TermsAndConditionsProps {
   logo?: string | null;
@@ -9,17 +9,46 @@ interface TermsAndConditionsProps {
 }
 
 const TermsAndConditions: React.FC<TermsAndConditionsProps> = ({ logo, isOpen, onClose, onSecretTrigger }) => {
-  const [secretClicks, setSecretClicks] = useState(0);
+  const lastTapRef = useRef<number>(0);
+  const clickCountRef = useRef<number>(0);
+  const clickTimerRef = useRef<any>(null);
 
   if (!isOpen) return null;
 
-  const handleSecretClick = () => {
-    const newCount = secretClicks + 1;
-    if (newCount >= 3) {
-      setSecretClicks(0);
-      onSecretTrigger();
+  const triggerSecret = () => {
+    onSecretTrigger();
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    triggerSecret();
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const now = Date.now();
+    const delta = now - lastTapRef.current;
+    if (delta > 30 && delta < 500) {
+      e.preventDefault();
+      e.stopPropagation();
+      lastTapRef.current = 0;
+      triggerSecret();
     } else {
-      setSecretClicks(newCount);
+      lastTapRef.current = now;
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    clickCountRef.current += 1;
+    if (clickCountRef.current >= 2) {
+      clickCountRef.current = 0;
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      triggerSecret();
+    } else {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = setTimeout(() => {
+        clickCountRef.current = 0;
+      }, 500);
     }
   };
 
@@ -47,8 +76,10 @@ const TermsAndConditions: React.FC<TermsAndConditionsProps> = ({ logo, isOpen, o
         <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gradient-to-b from-black to-zinc-950 custom-scrollbar">
           <div className="space-y-4">
             <h4 
-              onClick={handleSecretClick}
-              className="text-red-600 font-black uppercase text-[10px] tracking-[0.3em] cursor-default select-none active:opacity-70 transition-opacity"
+              onClick={handleClick}
+              onDoubleClick={handleDoubleClick}
+              onTouchEnd={handleTouchEnd}
+              className="text-red-600 font-black uppercase text-[10px] tracking-[0.3em] cursor-pointer select-none active:opacity-70 transition-opacity"
             >
               1. Autenticidad
             </h4>

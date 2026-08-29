@@ -633,9 +633,13 @@ const App: React.FC = () => {
       )}
 
       <TermsAndConditions 
+        logo={customLogo}
         isOpen={isTermsOpen} 
         onClose={() => setIsTermsOpen(false)} 
-        onSecretTrigger={() => setIsDevPanelOpen(true)}
+        onSecretTrigger={() => {
+          setIsTermsOpen(false);
+          setIsDevPanelOpen(true);
+        }}
       />
 
       <AIConsultant 

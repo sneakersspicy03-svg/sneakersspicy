@@ -8,67 +8,40 @@ interface StockXCategoryGridProps {
   onSelectCategory: (categoryName: string) => void;
 }
 
-interface CategoryItem {
-  id: string;
-  name: string;
-  displayTitle: string;
-  image: string;
-  fallbackQuery: string;
-}
-
 export const StockXCategoryGrid: React.FC<StockXCategoryGridProps> = ({
   products,
   sections = [],
   activeCategory,
   onSelectCategory,
 }) => {
-  // Find clean representative images from products
-  const getProductImageByFilter = (filterFn: (p: Product) => boolean, fallback: string) => {
-    const found = products.find(filterFn);
-    return found?.image || fallback;
+  // Helper to find a representative image for a section
+  const getSectionImage = (section: Section): string | null => {
+    if (section.imageUrl && section.imageUrl.trim()) {
+      return section.imageUrl.trim();
+    }
+
+    const secName = (section.name || '').toLowerCase();
+    const found = products.find(p => {
+      if (p.sectionId && p.sectionId === section.id) return true;
+      const pCat = (p.category || '').toLowerCase();
+      if (pCat === secName || pCat.includes(secName) || secName.includes(pCat)) return true;
+      if ((secName.includes('calzado') || secName.includes('tenis') || secName.includes('shoe') || secName.includes('sneaker')) &&
+          (pCat.includes('calzado') || pCat.includes('tenis') || pCat.includes('shoe') || pCat.includes('sneaker'))) return true;
+      if ((secName.includes('sportwear') || secName.includes('ropa') || secName.includes('apparel')) &&
+          (pCat.includes('sportwear') || pCat.includes('ropa') || pCat.includes('apparel') || pCat.includes('bermuda') || pCat.includes('licra'))) return true;
+      if ((secName.includes('media') || secName.includes('sock')) &&
+          (pCat.includes('media') || pCat.includes('sock'))) return true;
+      return false;
+    });
+
+    return found?.image || null;
   };
 
-  const defaultCategories: CategoryItem[] = [
-    {
-      id: 'sneakers',
-      name: 'Calzado',
-      displayTitle: 'Sneakers',
-      image: getProductImageByFilter(
-        p => (p.category || '').toLowerCase().includes('calzado') || (p.category || '').toLowerCase().includes('tenis') || (p.category || '').toLowerCase().includes('shoes'),
-        'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&q=80&w=400'
-      ),
-      fallbackQuery: 'sneakers'
-    },
-    {
-      id: 'shoes',
-      name: 'Calzado',
-      displayTitle: 'Shoes',
-      image: getProductImageByFilter(
-        p => (p.name || '').toLowerCase().includes('slide') || (p.name || '').toLowerCase().includes('croc') || (p.name || '').toLowerCase().includes('foam'),
-        'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&q=80&w=400'
-      ),
-      fallbackQuery: 'shoes'
-    },
-    {
-      id: 'apparel',
-      name: 'Sportwear',
-      displayTitle: 'Apparel',
-      image: getProductImageByFilter(
-        p => (p.category || '').toLowerCase().includes('sportwear') || (p.category || '').toLowerCase().includes('ropa') || (p.category || '').toLowerCase().includes('apparel') || (p.category || '').toLowerCase().includes('bermuda') || (p.category || '').toLowerCase().includes('licra'),
-        'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&q=80&w=400'
-      ),
-      fallbackQuery: 'apparel'
-    },
-    {
-      id: 'socks',
-      name: 'Medias',
-      displayTitle: 'Socks',
-      image: getProductImageByFilter(
-        p => (p.category || '').toLowerCase().includes('media') || (p.category || '').toLowerCase().includes('sock'),
-        'https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?auto=format&fit=crop&q=80&w=400'
-      ),
-      fallbackQuery: 'socks'
-    }
+  // Fallback if no sections in database yet
+  const displaySections: Section[] = sections.length > 0 ? sections : [
+    { id: 'sec-calzado', name: 'Calzado', emoji: '👟', photoCount: 6, sizeInputType: 'numeric', orderIndex: 0 },
+    { id: 'sec-sportwear', name: 'Sportwear', emoji: '👕', photoCount: 2, sizeInputType: 'clothing_letters', orderIndex: 1 },
+    { id: 'sec-medias', name: 'Medias', emoji: '🧦', photoCount: 2, sizeInputType: 'clothing_letters', orderIndex: 2 },
   ];
 
   return (
@@ -98,13 +71,14 @@ export const StockXCategoryGrid: React.FC<StockXCategoryGridProps> = ({
 
       {/* Horizontal Slice on Mobile / Grid on Tablet & Desktop */}
       <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory gap-3 sm:grid sm:grid-cols-4 sm:gap-5 pb-2 -mx-4 px-4 sm:mx-0 sm:px-0">
-        {defaultCategories.map((cat) => {
-          const isSelected = activeCategory?.toLowerCase() === cat.name.toLowerCase() || activeCategory?.toLowerCase() === cat.displayTitle.toLowerCase();
+        {displaySections.map((sec) => {
+          const isSelected = activeCategory?.toLowerCase() === sec.name.toLowerCase();
+          const imgUrl = getSectionImage(sec);
 
           return (
             <div
-              key={cat.id}
-              onClick={() => onSelectCategory(cat.name)}
+              key={sec.id}
+              onClick={() => onSelectCategory(isSelected ? '' : sec.name)}
               className="group flex flex-col items-center cursor-pointer active:scale-95 transition-transform w-[135px] sm:w-auto shrink-0 snap-start"
             >
               {/* Dark Square Container */}
@@ -115,12 +89,20 @@ export const StockXCategoryGrid: React.FC<StockXCategoryGridProps> = ({
                     : 'border-white/10 hover:border-red-600/60'
                 } p-3.5 sm:p-6 flex items-center justify-center overflow-hidden transition-all duration-300 shadow-xl group-hover:shadow-red-950/20`}
               >
-                <img
-                  src={cat.image}
-                  alt={cat.displayTitle}
-                  loading="lazy"
-                  className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] group-hover:scale-115 transition-transform duration-500"
-                />
+                {imgUrl ? (
+                  <img
+                    src={imgUrl}
+                    alt={sec.name}
+                    loading="lazy"
+                    className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] group-hover:scale-110 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <span className="text-4xl sm:text-5xl select-none group-hover:scale-110 transition-transform duration-300 drop-shadow">
+                      {sec.emoji || '👟'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Category Label Below Container */}
@@ -129,7 +111,7 @@ export const StockXCategoryGrid: React.FC<StockXCategoryGridProps> = ({
                   isSelected ? 'text-red-500' : 'text-white group-hover:text-red-500'
                 }`}
               >
-                {cat.displayTitle}
+                {sec.name}
               </span>
             </div>
           );
