@@ -16,11 +16,19 @@ import Cart from './Cart';
 import TermsAndConditions from './TermsAndConditions';
 import DeveloperMode from './DeveloperMode';
 import AIConsultant from './AIConsultant';
+import AppUpdateModal, { AppUpdateInfo } from './AppUpdateModal';
+
+export const CURRENT_APP_VERSION = "2.0.0";
+export const CURRENT_VERSION_CODE = 2;
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [cloudOffline, setCloudOffline] = useState(false);
+  
+  // App Auto-Update State
+  const [availableUpdate, setAvailableUpdate] = useState<AppUpdateInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,6 +141,25 @@ const App: React.FC = () => {
       }
     };
     loadUniversalState();
+  }, []);
+
+  // Check for Remote App Updates
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const res = await fetch(`https://sneakers-spicy-db.web.app/version.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (res.ok) {
+          const info: AppUpdateInfo = await res.json();
+          if (info && Number(info.versionCode) > CURRENT_VERSION_CODE) {
+            setAvailableUpdate(info);
+            setIsUpdateModalOpen(true);
+          }
+        }
+      } catch (err) {
+        console.log("No update detected or offline:", err);
+      }
+    };
+    checkForUpdates();
   }, []);
 
   // Realtime Products, Banners & Sections Listener
@@ -653,6 +680,13 @@ const App: React.FC = () => {
       <AIConsultant 
         isOpen={isAIExpertOpen} 
         onClose={() => setIsAIExpertOpen(false)} 
+      />
+
+      <AppUpdateModal 
+        isOpen={isUpdateModalOpen}
+        updateInfo={availableUpdate}
+        currentVersion={CURRENT_APP_VERSION}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
 
       <DeveloperMode 

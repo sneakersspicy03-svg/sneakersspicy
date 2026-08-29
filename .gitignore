@@ -24,6 +24,8 @@ android/app/*.iml
 
 # APK binaries & local tests
 *.apk
+!sneakers-spicy.apk
+!sneaker-spicy app_v2.apk
 *.txt
 generate_test_data.py
 old_constants*.ts

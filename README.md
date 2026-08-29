@@ -1,40 +1,49 @@
+# Sneakers Spicy | App Móvil (Android) 👟🔥
 
-# Sneakers Spicy | Premium Footwear Store
+Aplicación móvil oficial de **Sneakers Spicy** desarrollada con React, TypeScript, Tailwind CSS y Capacitor para Android.
 
-A premium sneaker and athletic footwear boutique featuring professional-grade shoes, limited drops, and an AI Sneaker Consultant.
+---
 
-## Project Structure
+## 📲 Descarga Directa del APK
 
-This project is built using React, TypeScript, and Tailwind CSS. It features a real-time synchronization service for inventory management.
+Puedes descargar la última versión de la aplicación directamente sin necesidad de usar memorias USB:
 
-## Getting Started
+[![Descargar APK](https://img.shields.io/badge/Descargar-APK%20Directo-red?style=for-the-badge&logo=android)](https://sneakers-spicy-db.web.app/sneakers-spicy.apk)
 
-### Run the project locally
+- **Enlace Directo CDN:** [https://sneakers-spicy-db.web.app/sneakers-spicy.apk](https://sneakers-spicy-db.web.app/sneakers-spicy.apk)
+- **Versión Actual:** `v2.0.0` (Build 2)
+- **Tamaño:** ~6.36 MB
 
-To start the development server:
+---
+
+## 🚀 Sistema de Actualización Automática In-App
+
+La aplicación incluye un sistema de detección y actualización automática:
+1. Al abrir la app, escanea el endpoint remoto [`version.json`](https://sneakers-spicy-db.web.app/version.json).
+2. Si detecta una nueva versión compilada, despliega un **Pop-up emergente de Actualización** con el resumen de novedades.
+3. Al presionar **"Descargar e Instalar"**, el instalador nativo de Android actualiza la app de manera transparente sin perder tu sesión ni configuraciones.
+
+---
+
+## 🛠️ Comandos de Desarrollo y Compilación
 
 ```bash
+# Instalar dependencias
 npm install
+
+# Servidor de desarrollo
 npm run dev
-```
 
-### Build for Production
-
-To create a production build in the `dist` folder:
-
-```bash
+# Compilar proyecto Web & Sincronizar Capacitor
 npm run build
+npx cap sync
+
+# Compilar APK Android
+cd android
+./gradlew assembleDebug
 ```
 
-### Deploy to GitHub Pages
+---
 
-The project is configured to work with relative paths via `base: './'` in `vite.config.ts`. To deploy:
-
-1. Build the project: `npm run build`
-2. Push the content of the `dist` folder to your `gh-pages` branch.
-
-## AI Sneaker Consultant
-
-Powered by Google Gemini AI, providing expert advice on sizing, drops, and styling.
-
-[Explore in AI Studio](https://aistudio.google.com/)
+## 🌐 Tienda Web
+- **Sitio Web Oficial:** [https://sneakers-spicy-db.web.app](https://sneakers-spicy-db.web.app)
