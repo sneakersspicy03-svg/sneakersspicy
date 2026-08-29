@@ -407,9 +407,17 @@ const App: React.FC = () => {
         {/* If user is not searching or filtering, show complete StockX overview in Spicy Dark theme */}
         {!isFilteringActive ? (
           <>
-            {/* 1. Top Promo Auction / Drop Banner Carousel with Touch Swipe Support */}
+            {/* 1. Top Promo Banner Carousel with Touch Swipe Support (Only User-Created Banners) */}
             <StockXHeroBanner 
-              customBanners={tennisBrands}
+              customBanners={[...tennisBrands, ...socksBrands, ...currentCategories]}
+              onBannerClick={(slide) => {
+                const b = slide?.originalBanner;
+                if (b) {
+                  if (b.name) handleSelectBrand(b.name);
+                  else if (b.brand) handleSelectBrand(b.brand);
+                }
+                document.getElementById('explore-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }}
               onExploreClick={() => {
                 document.getElementById('explore-grid')?.scrollIntoView({ behavior: 'smooth' });
               }}

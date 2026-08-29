@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { BrandStock } from '../types';
+import { BrandStock, SportwearCategory } from '../types';
 
 interface StockXHeroBannerProps {
-  customBanners?: BrandStock[];
+  customBanners?: (BrandStock | SportwearCategory | any)[];
   onBannerClick?: (banner: any) => void;
   onExploreClick?: () => void;
 }
@@ -18,34 +18,8 @@ interface PromoSlide {
   accentColor?: string;
   image?: string;
   isCustom?: boolean;
+  originalBanner?: any;
 }
-
-const DEFAULT_SLIDES: PromoSlide[] = [
-  {
-    id: 'auction-summer',
-    badge: 'AUCTIONS',
-    title: 'The Summer League Auction',
-    subtitle: 'Signed & Game-Worn Items from Rising Stars',
-    ctaText: 'Preview Now',
-    image: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&q=80&w=1200'
-  },
-  {
-    id: 'travis-scott-drop',
-    badge: 'EXCLUSIVE DROP',
-    title: 'Cactus Jack & Retro Vault',
-    subtitle: 'Autenticados al 100% y listos para envío inmediato',
-    ctaText: 'Comprar Ahora',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&q=80&w=1200'
-  },
-  {
-    id: 'performance-sportwear',
-    badge: 'SPORTWEAR & MEDIAS',
-    title: 'Pro Performance Collection',
-    subtitle: 'Sets Dri-Fit, bermudas técnicas y calcetines élite',
-    ctaText: 'Ver Colección',
-    image: 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=1200'
-  }
-];
 
 export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
   customBanners = [],
@@ -56,20 +30,26 @@ export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
-  // Combine custom banners (uploaded from Firestore) with default slides
-  const slides: PromoSlide[] = [
-    // Prioritize custom banners uploaded in Firebase if any exist
-    ...customBanners.filter(b => b.marqueeImage || b.logo).map((b, idx) => ({
-      id: b.id || `custom-${idx}`,
-      badge: b.bannerSubtitle || 'FEATURED BRAND',
-      title: b.bannerTitle || b.name || 'Colección Especial',
-      subtitle: b.brand ? `Explora toda la línea exclusiva de ${b.brand}` : 'Disponibilidad inmediata en Spicy Vault',
+  // Strictly use user-created banners from Firestore
+  const validBanners = customBanners.filter(b => b.marqueeImage || (b as any).image || b.logo);
+
+  const slides: PromoSlide[] = validBanners.map((b, idx) => {
+    const rawImage = b.marqueeImage || (b as any).image || b.logo || '';
+    const title = b.bannerTitle || b.name || (b as any).title || 'Colección Especial';
+    const badge = b.bannerSubtitle || (b as any).subtitle || (b.brand ? b.brand.toUpperCase() : 'SPICY VAULT');
+    const subtitle = b.brand ? `Explora toda la línea exclusiva de ${b.brand}` : 'Disponibilidad inmediata en Spicy Vault';
+
+    return {
+      id: b.id || `banner-${idx}`,
+      badge,
+      title,
+      subtitle,
       ctaText: 'Explorar Marca',
-      image: b.marqueeImage || b.logo,
+      image: rawImage,
       isCustom: true,
-    })),
-    ...DEFAULT_SLIDES
-  ];
+      originalBanner: b
+    };
+  });
 
   useEffect(() => {
     if (slides.length <= 1) return;
@@ -112,6 +92,8 @@ export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
     touchStartX.current = null;
     touchEndX.current = null;
   };
+
+  if (slides.length === 0) return null;
 
   const activeSlide = slides[currentIndex] || slides[0];
 
@@ -172,7 +154,11 @@ export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (onExploreClick) onExploreClick();
+                if (onBannerClick) {
+                  onBannerClick(activeSlide);
+                } else if (onExploreClick) {
+                  onExploreClick();
+                }
               }}
               className="inline-flex items-center text-xs sm:text-sm font-black uppercase tracking-wider text-white hover:text-red-500 underline underline-offset-4 transition-colors group/btn"
             >
@@ -185,23 +171,25 @@ export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
         </div>
 
         {/* Pagination Dots (Bottom-Right Pill Indicator) */}
-        <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-20 flex items-center space-x-1.5 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentIndex(idx);
-              }}
-              aria-label={`Slide ${idx + 1}`}
-              className={`transition-all duration-300 rounded-full ${
-                currentIndex === idx
-                  ? 'w-5 h-2 bg-red-600 shadow-md shadow-red-900/60'
-                  : 'w-2 h-2 bg-white/30 hover:bg-white/60'
-              }`}
-            />
-          ))}
-        </div>
+        {slides.length > 1 && (
+          <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-20 flex items-center space-x-1.5 bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 shadow-lg">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentIndex(idx);
+                }}
+                aria-label={`Slide ${idx + 1}`}
+                className={`transition-all duration-300 rounded-full ${
+                  currentIndex === idx
+                    ? 'w-5 h-2 bg-red-600 shadow-md shadow-red-900/60'
+                    : 'w-2 h-2 bg-white/30 hover:bg-white/60'
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
