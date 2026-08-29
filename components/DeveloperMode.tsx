@@ -73,7 +73,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [showAddSectionForm, setShowAddSectionForm] = useState(false);
   const [newSectionData, setNewSectionData] = useState<Omit<Section, 'id' | 'orderIndex'>>({
-    name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric'
+    name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric', imageUrl: ''
   });
   const [editingSection, setEditingSection] = useState<Section | null>(null);
 
@@ -184,7 +184,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
     setActiveTab('add');
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, slot: string, target: 'product' | 'banner' | 'logo' = 'product') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, slot: string, target: 'product' | 'banner' | 'logo' | 'section' = 'product') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -198,6 +198,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         oldUrl = editingBanner ? (editingBanner.data.marqueeImage || editingBanner.data.image) : newBannerData.image;
       } else if (target === 'logo') {
         oldUrl = logo || null;
+      } else if (target === 'section') {
+        oldUrl = newSectionData.imageUrl || null;
       }
 
       const url = await syncService.uploadImage(file);
@@ -212,6 +214,8 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         }
       } else if (target === 'logo') {
         onUpdateLogo(url);
+      } else if (target === 'section') {
+        setNewSectionData(prev => ({ ...prev, imageUrl: url }));
       }
     } catch (error: any) {
       alert(`❌ Error al subir a Cloudinary: ${error.message}`);
@@ -308,6 +312,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const handleSaveSection = async (e?: React.MouseEvent) => {
     e?.preventDefault();
+    if (!newSectionData.name.trim()) return alert("⚠️ El nombre de la sección es obligatorio.");
     try {
       if (editingSection) {
         await onUpdateSection({ ...editingSection, ...newSectionData });
@@ -316,7 +321,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         await onAddSection({ ...newSectionData, orderIndex: sections.length });
       }
       setShowAddSectionForm(false);
-      setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' });
+      setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric', imageUrl: '' });
     } catch (err: any) {
       console.error("❌ Error en handleSaveSection:", err);
       alert(`Error al guardar sección: ${err.message}`);
@@ -810,6 +815,34 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                         <option value="clothing_letters">Letras (S, M, L, XL...)</option>
                       </select>
                     </div>
+
+                    <div className="space-y-2 lg:col-span-4">
+                      <label className="text-[9px] font-black uppercase text-zinc-500 ml-2">Imagen Representativa de la Sección (Opcional - Shop by Category)</label>
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-1 bg-black border border-white/10 p-4 rounded-xl text-xs font-bold text-zinc-400 italic truncate">
+                          {newSectionData.imageUrl ? "✅ Imagen de sección asignada" : "Subir imagen representativa"}
+                        </div>
+                        <label className="cursor-pointer bg-red-600 hover:bg-red-500 p-4 rounded-xl transition-all shadow-lg active:scale-95 text-white flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          <span className="text-[10px] font-black uppercase">{newSectionData.imageUrl ? 'Cambiar Foto' : 'Subir Foto'}</span>
+                          <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'imageUrl', 'section')} accept="image/*" />
+                        </label>
+                        {newSectionData.imageUrl && (
+                          <button 
+                            type="button" 
+                            onClick={() => setNewSectionData(prev => ({ ...prev, imageUrl: '' }))}
+                            className="p-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-xl text-xs font-black uppercase transition-colors"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                      {newSectionData.imageUrl && (
+                        <div className="mt-3 w-32 h-32 rounded-2xl overflow-hidden border border-white/10 bg-black/60 p-2 flex items-center justify-center">
+                          <img src={newSectionData.imageUrl} alt="Preview Sección" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex space-x-4 pt-4">
                     <button 
@@ -818,7 +851,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     >
                       {editingSection ? 'Guardar Cambios' : 'Crear Sección'}
                     </button>
-                    <button onClick={() => { setShowAddSectionForm(false); setEditingSection(null); setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric' }); }} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
+                    <button onClick={() => { setShowAddSectionForm(false); setEditingSection(null); setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric', imageUrl: '' }); }} className="px-8 bg-zinc-800 text-zinc-500 py-4 rounded-xl font-black text-[10px] uppercase hover:text-white">Cancelar</button>
                   </div>
                 </div>
               )}
@@ -837,12 +870,21 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                     className="bg-black/40 p-6 rounded-[2.5rem] border border-white/5 group hover:border-red-600/30 transition-all relative overflow-hidden"
                   >
                     <div className="flex items-center space-x-5">
-                      <div className="text-4xl bg-zinc-900 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner group-hover:scale-110 transition-transform">{section.emoji}</div>
+                      <div className="text-4xl bg-zinc-900 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner group-hover:scale-110 transition-transform overflow-hidden relative border border-white/5">
+                        {section.imageUrl ? (
+                          <img src={section.imageUrl} alt={section.name} className="w-full h-full object-contain p-1" />
+                        ) : (
+                          section.emoji
+                        )}
+                      </div>
                       <div className="flex-1">
                         <h5 className="font-black text-sm uppercase italic tracking-tighter">{section.name}</h5>
                         <div className="flex items-center space-x-2 mt-1">
                           <span className="text-[8px] font-black bg-zinc-800 px-2 py-0.5 rounded text-zinc-500 uppercase">{section.photoCount} FOTOS</span>
                           <span className="text-[8px] font-black bg-zinc-800 px-2 py-0.5 rounded text-zinc-500 uppercase">{section.sizeInputType === 'numeric' ? 'NUM' : 'ALF'}</span>
+                          {section.imageUrl && (
+                            <span className="text-[8px] font-black bg-green-950 text-green-400 border border-green-800 px-2 py-0.5 rounded uppercase">FOTO ASIGNADA</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -850,7 +892,7 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
                       <button 
                         onClick={() => {
                           setEditingSection(section);
-                          setNewSectionData({ name: section.name, subtitle: section.subtitle || '', emoji: section.emoji, photoCount: section.photoCount, sizeInputType: section.sizeInputType });
+                          setNewSectionData({ name: section.name, subtitle: section.subtitle || '', emoji: section.emoji, photoCount: section.photoCount, sizeInputType: section.sizeInputType, imageUrl: section.imageUrl || '' });
                           setShowAddSectionForm(true);
                         }} 
                         className="p-2 text-zinc-500 hover:text-blue-500 transition-colors"

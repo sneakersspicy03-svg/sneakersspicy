@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production / Build
+dist/
+build/
+
+# Firebase & IDE
+.firebase/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
