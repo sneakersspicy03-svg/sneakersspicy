@@ -1,0 +1,9 @@
+{
+  "appId": "com.sneakersspicy.app",
+  "appName": "Sneakers Spicy",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  }
+}

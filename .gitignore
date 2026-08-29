@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production / Build
+dist/
+build/
+android/app/build/
+android/.gradle/
+android/build/
+android/captures/
+android/.idea/
+android/*.iml
+android/app/*.iml
+
+# Firebase & IDE
+.firebase/
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+
+# APK binaries & local tests
+*.apk
+*.txt
+generate_test_data.py
+old_constants*.ts
+
+# Environment
+.env
+.env.local
+.env.*.local

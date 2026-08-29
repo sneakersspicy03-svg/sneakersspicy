@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Sneakers Spicy</string>
+    <string name="title_activity_main">Sneakers Spicy</string>
+    <string name="package_name">com.sneakersspicy.app</string>
+    <string name="custom_url_scheme">com.sneakersspicy.app</string>
+</resources>
