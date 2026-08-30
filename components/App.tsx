@@ -20,8 +20,8 @@ import DeveloperMode from './DeveloperMode';
 import AIConsultant from './AIConsultant';
 import AppUpdateModal, { AppUpdateInfo } from './AppUpdateModal';
 
-export const CURRENT_APP_VERSION = "2.1.0";
-export const CURRENT_VERSION_CODE = 3;
+export const CURRENT_APP_VERSION = "2.1.1";
+export const CURRENT_VERSION_CODE = 4;
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -632,7 +632,8 @@ const App: React.FC = () => {
 
             {/* 4. Popular Brand Filter Pills */}
             <StockXBrandPills 
-              brands={[...tennisBrands, ...socksBrands]}
+              brands={[...tennisBrands, ...socksBrands, ...currentCategories]}
+              products={currentProducts}
               selectedBrand={filters.brand}
               onSelectBrand={handleSelectBrand}
             />
@@ -658,7 +659,8 @@ const App: React.FC = () => {
           {isFilteringActive && (
             <div className="mb-4">
               <StockXBrandPills 
-                brands={[...tennisBrands, ...socksBrands]}
+                brands={[...tennisBrands, ...socksBrands, ...currentCategories]}
+                products={currentProducts}
                 selectedBrand={filters.brand}
                 onSelectBrand={handleSelectBrand}
                 onBack={handleResetFilters}

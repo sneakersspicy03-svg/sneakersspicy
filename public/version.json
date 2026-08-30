@@ -1,14 +1,13 @@
 {
-  "version": "2.1.0",
-  "versionCode": 3,
+  "version": "2.1.1",
+  "versionCode": 4,
   "downloadUrl": "https://github.com/sneakersspicy03-svg/sneakersspicy/raw/app-mobile/sneakers-spicy.apk",
   "releaseDate": "2026-08-30",
-  "title": "Actualización Sneakers Spicy v2.1",
+  "title": "Actualización Sneakers Spicy v2.1.1",
   "changelog": [
-    "Filtrado exclusivo de banners por categoría (Sportwear, Calzado, Medias)",
-    "Soporte y navegación completa con el botón de retroceso nativo de tu celular",
-    "Mejoras de estabilidad y navegación fluida",
-    "Optimización en la sincronización de inventario"
+    "Eliminación de marcas duplicadas y marcas de ejemplo no creadas",
+    "Lista de marcas 100% real generada desde tus banners y productos",
+    "Filtros de catálogo más precisos y optimizados"
   ],
   "forceUpdate": false
 }
