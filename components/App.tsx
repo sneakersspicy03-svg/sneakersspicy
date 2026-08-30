@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../constants';
 import { Product, CartItem, BrandStock, FilterState, SportwearCategory, Section } from '../types';
 import { syncService, GlobalState, db } from '../services/syncService';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { App as CapApp } from '@capacitor/app';
 import { isBannerForCategory } from '../services/categoryUtils';
 
@@ -145,23 +145,46 @@ const App: React.FC = () => {
     loadUniversalState();
   }, []);
 
-  // Check for Remote App Updates
+  // Check for Remote App Updates (Firestore Realtime + Multi-Endpoint Fallbacks)
   useEffect(() => {
-    const checkForUpdates = async () => {
-      try {
-        const res = await fetch(`https://sneakers-spicy-db.web.app/version.json?t=${Date.now()}`, { cache: 'no-store' });
-        if (res.ok) {
-          const info: AppUpdateInfo = await res.json();
-          if (info && Number(info.versionCode) > CURRENT_VERSION_CODE) {
-            setAvailableUpdate(info);
-            setIsUpdateModalOpen(true);
-          }
+    // 1. Realtime Firestore update listener (bypasses all CORS and CDN caching issues)
+    const unsubAppVersion = onSnapshot(doc(db, "ajustes", "app_version"), (docSnap) => {
+      if (docSnap.exists()) {
+        const info = docSnap.data() as AppUpdateInfo;
+        if (info && Number(info.versionCode) > CURRENT_VERSION_CODE) {
+          setAvailableUpdate(info);
+          setIsUpdateModalOpen(true);
         }
-      } catch (err) {
-        console.log("No update detected or offline:", err);
+      }
+    }, (err) => {
+      console.log("Firestore app_version listener note:", err);
+    });
+
+    // 2. HTTP endpoints fallback
+    const checkEndpoints = async () => {
+      const endpoints = [
+        `https://sneakers-spicy-db.web.app/version.json?t=${Date.now()}`,
+        `https://raw.githubusercontent.com/sneakersspicy03-svg/sneakersspicy/app-mobile/public/version.json?t=${Date.now()}`
+      ];
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (res.ok) {
+            const info: AppUpdateInfo = await res.json();
+            if (info && Number(info.versionCode) > CURRENT_VERSION_CODE) {
+              setAvailableUpdate(info);
+              setIsUpdateModalOpen(true);
+              break;
+            }
+          }
+        } catch (e) {}
       }
     };
-    checkForUpdates();
+    checkEndpoints();
+
+    return () => {
+      unsubAppVersion();
+    };
   }, []);
 
   // Realtime Products, Banners & Sections Listener
