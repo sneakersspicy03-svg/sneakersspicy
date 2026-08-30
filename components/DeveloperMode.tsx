@@ -357,6 +357,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       bannerSubtitle: newBannerData.subtitle,
       availableSizes: sizes,
       format: newBannerData.format,
+      section: showAddBannerForm.section || 'Calzado',
+      sectionName: showAddBannerForm.section || 'Calzado',
+      category: (showAddBannerForm.section || 'Calzado').toLowerCase(),
       type: showAddBannerForm.section === 'Calzado' ? 'tennis' : showAddBannerForm.section === 'Medias' ? 'socks' : 'sportwear'
     };
 
@@ -391,6 +394,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         image: editingBanner.data.image || editingBanner.data.marqueeImage || '',
         format: editingBanner.data.format || 'horizontal',
         type: editingBanner.type,
+        section: editingBanner.data.section || (editingBanner.type === 'tennis' ? 'Calzado' : editingBanner.type === 'socks' ? 'Medias' : 'Sportwear'),
+        sectionName: editingBanner.data.sectionName || (editingBanner.type === 'tennis' ? 'Calzado' : editingBanner.type === 'socks' ? 'Medias' : 'Sportwear'),
+        category: editingBanner.data.category || (editingBanner.type === 'tennis' ? 'calzado' : editingBanner.type === 'socks' ? 'medias' : 'sportwear'),
         lastUpdated: Date.now()
       };
 

@@ -191,6 +191,10 @@ export function validateBannerPayload(raw: any): ValidationResult<any> {
     errors.push('El banner debe tener una imagen válida.');
   }
 
+  const section = sanitizeString(raw.section || raw.sectionName, 80);
+  const sectionId = sanitizeString(raw.sectionId, 80);
+  const category = sanitizeString(raw.category, 80);
+
   const sanitizedData = {
     id: raw.id ? sanitizeString(raw.id, 80) : undefined,
     name: name || bannerTitle,
@@ -199,6 +203,10 @@ export function validateBannerPayload(raw: any): ValidationResult<any> {
     brand,
     format,
     type,
+    section: section || (type === 'tennis' ? 'Calzado' : type === 'socks' ? 'Medias' : 'Sportwear'),
+    sectionName: section || (type === 'tennis' ? 'Calzado' : type === 'socks' ? 'Medias' : 'Sportwear'),
+    sectionId,
+    category: category || (type === 'tennis' ? 'calzado' : type === 'socks' ? 'medias' : 'sportwear'),
     image,
     marqueeImage: image,
     availableSizes: Array.isArray(raw.availableSizes) 

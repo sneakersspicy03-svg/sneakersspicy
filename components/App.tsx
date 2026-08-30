@@ -3,6 +3,8 @@ import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../
 import { Product, CartItem, BrandStock, FilterState, SportwearCategory, Section } from '../types';
 import { syncService, GlobalState, db } from '../services/syncService';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { App as CapApp } from '@capacitor/app';
+import { isBannerForCategory } from '../services/categoryUtils';
 
 import Header from './Header';
 import StockXHeroBanner from './StockXHeroBanner';
@@ -180,13 +182,9 @@ const App: React.FC = () => {
         banners.push({ id: doc.id, ...doc.data() });
       });
 
-      const isTennis = (b: any) => b.type === 'tennis' || b.type === 'shoes' || b.type === 'calzado' || b.category === 'calzado' || b.category === 'shoes' || b.category === 'tennis' || b.sectionId === 'calzado';
-      const isSocks = (b: any) => b.type === 'socks' || b.type === 'medias' || b.category === 'medias' || b.category === 'socks' || b.sectionId === 'medias';
-      const isSportwear = (b: any) => b.type === 'sportwear' || b.type === 'sportware' || b.type === 'ropa' || b.category === 'sportwear' || b.category === 'sportware' || b.category === 'ropa' || b.sectionId === 'sportwear' || b.sectionId === 'sportware' || (!isTennis(b) && !isSocks(b));
-
-      const tBrands = banners.filter(isTennis);
-      const sBrands = banners.filter(isSocks);
-      const cats = banners.filter(isSportwear);
+      const tBrands = banners.filter(b => isBannerForCategory(b, 'calzado'));
+      const sBrands = banners.filter(b => isBannerForCategory(b, 'medias'));
+      const cats = banners.filter(b => isBannerForCategory(b, 'sportwear'));
 
       setTennisBrands(tBrands);
       setSocksBrands(sBrands);
@@ -212,6 +210,116 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('spicy_cart', JSON.stringify(cartItems));
   }, [cartItems]);
+
+  // Native Mobile Back Button & PopState Navigation Stack Handler
+  useEffect(() => {
+    const handleBackNavigation = (): boolean => {
+      // 1. Si está abierto el detalle de un producto -> Cerrar modal de producto
+      if (selectedProduct) {
+        setSelectedProduct(null);
+        return true;
+      }
+      // 2. Si está abierto el carrito -> Cerrar carrito
+      if (isCartOpen) {
+        setIsCartOpen(false);
+        return true;
+      }
+      // 3. Si están abiertos los favoritos -> Cerrar favoritos
+      if (isWishlistOpen) {
+        setIsWishlistOpen(false);
+        return true;
+      }
+      // 4. Si está abierto el panel de desarrollador -> Cerrar modo dev
+      if (isDevPanelOpen) {
+        setIsDevPanelOpen(false);
+        return true;
+      }
+      // 5. Si está abierto el consultor IA -> Cerrar consultor IA
+      if (isAIExpertOpen) {
+        setIsAIExpertOpen(false);
+        return true;
+      }
+      // 6. Si están abiertos los términos y condiciones -> Cerrar términos
+      if (isTermsOpen) {
+        setIsTermsOpen(false);
+        return true;
+      }
+      // 7. Si está abierto el modal de actualización -> Cerrar modal
+      if (isUpdateModalOpen) {
+        setIsUpdateModalOpen(false);
+        return true;
+      }
+      // 8. Si hay una búsqueda de texto activa -> Limpiar búsqueda
+      if (searchQuery.trim()) {
+        setSearchQuery('');
+        return true;
+      }
+      // 9. Si hay una marca o talla seleccionada -> Limpiar marca/talla para regresar a la lista de marcas/banners
+      if (filters.brand || filters.size) {
+        setFilters(prev => ({ ...prev, brand: null, size: null }));
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return true;
+      }
+      // 10. Si hay una categoría seleccionada -> Limpiar categoría para regresar a la vista Home principal
+      if (filters.category) {
+        setFilters({ brand: null, size: null, category: null });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return true;
+      }
+
+      // No hay overlays ni filtros activos: estamos en la raíz del inicio
+      return false;
+    };
+
+    // Capacitor Native Android Hardware Back Button listener
+    let backListenerHandle: any = null;
+    try {
+      CapApp.addListener('backButton', ({ canGoBack }) => {
+        const handled = handleBackNavigation();
+        if (!handled) {
+          CapApp.exitApp();
+        }
+      }).then(handle => {
+        backListenerHandle = handle;
+      }).catch(err => {
+        console.log("Capacitor App listener not active in web mode:", err);
+      });
+    } catch (e) {
+      console.log("Capacitor App listener error:", e);
+    }
+
+    // Web PopState listener (Browser back gesture / button)
+    const handlePopState = () => {
+      const handled = handleBackNavigation();
+      if (handled) {
+        try {
+          window.history.pushState({ appNav: true }, '');
+        } catch (e) {}
+      }
+    };
+
+    try {
+      window.history.replaceState({ appNav: true }, '');
+      window.addEventListener('popstate', handlePopState);
+    } catch (e) {}
+
+    return () => {
+      if (backListenerHandle && typeof backListenerHandle.remove === 'function') {
+        backListenerHandle.remove();
+      }
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [
+    selectedProduct,
+    isCartOpen,
+    isWishlistOpen,
+    isDevPanelOpen,
+    isAIExpertOpen,
+    isTermsOpen,
+    isUpdateModalOpen,
+    searchQuery,
+    filters
+  ]);
 
   const publishState = useCallback(async (updates: Partial<GlobalState>) => {
     setIsPublishing(true);
@@ -305,21 +413,15 @@ const App: React.FC = () => {
     });
   }, [currentProducts]);
 
-  // Determine current active banners for selected category
+  // Determine current active banners for selected category (strictly only banners of that category)
   const activeCategoryBanners = useMemo(() => {
     if (!filters.category) return [];
-    const cat = filters.category.toLowerCase();
-    if (cat.includes('calzado') || cat.includes('sneaker') || cat.includes('shoe')) {
-      return tennisBrands;
-    } else if (cat.includes('sportwear') || cat.includes('apparel') || cat.includes('ropa')) {
-      return currentCategories;
-    } else if (cat.includes('media') || cat.includes('sock')) {
-      return socksBrands;
-    }
-    return [...tennisBrands, ...currentCategories, ...socksBrands];
-  }, [filters.category, tennisBrands, currentCategories, socksBrands]);
+    const allBanners = [...tennisBrands, ...socksBrands, ...currentCategories];
+    return allBanners.filter(b => isBannerForCategory(b, filters.category));
+  }, [filters.category, tennisBrands, socksBrands, currentCategories]);
 
   const handleSelectCategory = (categoryName: string) => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
     setFilters(prev => ({
       ...prev,
       category: categoryName || null,
@@ -331,6 +433,9 @@ const App: React.FC = () => {
   };
 
   const handleSelectBrand = (brandName: string | null) => {
+    if (brandName) {
+      try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    }
     setFilters(prev => ({
       ...prev,
       brand: brandName
@@ -341,6 +446,7 @@ const App: React.FC = () => {
   };
 
   const handleSelectBrandAndSize = (brandName: string, size: number | string) => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
     setFilters(prev => ({
       ...prev,
       brand: brandName,
@@ -353,6 +459,36 @@ const App: React.FC = () => {
     setFilters({ brand: null, size: null, category: null });
     setSearchQuery('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenProduct = (p: Product) => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    setSelectedProduct(p);
+  };
+
+  const handleOpenCart = () => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    setIsCartOpen(true);
+  };
+
+  const handleOpenWishlist = () => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    setIsWishlistOpen(true);
+  };
+
+  const handleOpenTerms = () => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    setIsTermsOpen(true);
+  };
+
+  const handleOpenDev = () => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    setIsDevPanelOpen(true);
+  };
+
+  const handleOpenAI = () => {
+    try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
+    setIsAIExpertOpen(true);
   };
 
   const handleAddToCart = (p: Product, s: number | string) => {
@@ -418,10 +554,10 @@ const App: React.FC = () => {
         wishlistCount={wishlistIds.length}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onOpenCart={() => setIsCartOpen(true)} 
-        onOpenWishlist={() => setIsWishlistOpen(true)}
-        onOpenTerms={() => setIsTermsOpen(true)} 
-        onOpenDev={() => setIsDevPanelOpen(true)}
+        onOpenCart={handleOpenCart} 
+        onOpenWishlist={handleOpenWishlist}
+        onOpenTerms={handleOpenTerms} 
+        onOpenDev={handleOpenDev}
         onHome={handleResetFilters}
         isDevMode={isDevMode} 
         isAdminAuthorized={isAdminAuthorized} 
@@ -454,7 +590,7 @@ const App: React.FC = () => {
             <StockXRecommendedSection 
               title="Recommended For You"
               products={recommendedProducts}
-              onSelectProduct={(p) => setSelectedProduct(p)}
+              onSelectProduct={handleOpenProduct}
               onAddToCart={handleAddToCart}
               wishlistedIds={wishlistIds}
               onToggleWishlist={handleToggleWishlist}
@@ -552,7 +688,7 @@ const App: React.FC = () => {
                 <StockXProductCard 
                   key={product.id}
                   product={product}
-                  onClick={() => setSelectedProduct(product)}
+                  onClick={() => handleOpenProduct(product)}
                   onAddToCart={handleAddToCart}
                   isWishlisted={wishlistIds.includes(product.id)}
                   onToggleWishlist={handleToggleWishlist}
@@ -565,7 +701,7 @@ const App: React.FC = () => {
 
       {/* Floating AI Consultant Button with Spicy Flame Glow */}
       <button
-        onClick={() => setIsAIExpertOpen(true)}
+        onClick={handleOpenAI}
         aria-label="Consultor IA de Sneakers"
         className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white p-3.5 sm:px-5 sm:py-3.5 rounded-2xl shadow-[0_0_30px_rgba(239,68,68,0.4)] flex items-center space-x-2.5 transition-all duration-300 hover:scale-105 active:scale-95 border border-red-500/50"
       >
@@ -628,7 +764,7 @@ const App: React.FC = () => {
                     <div 
                       key={p.id}
                       onClick={() => {
-                        setSelectedProduct(p);
+                        handleOpenProduct(p);
                         setIsWishlistOpen(false);
                       }}
                       className="flex items-center space-x-3.5 p-3 rounded-2xl border border-white/10 bg-zinc-900/60 hover:border-red-600/50 cursor-pointer transition-all shadow-md"

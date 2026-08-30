@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getFirestore, doc, setDoc, getDoc, collection, deleteDoc, getDocs, updateDoc, addDoc } from "firebase/firestore";
 import { Product, SportwearCategory, BrandStock, Section } from '../types';
+import { isBannerForCategory } from './categoryUtils';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I",
@@ -229,13 +230,9 @@ export const syncService = {
       const bannersList = await syncService.getBanners();
       const sectionsList = await syncService.getSections();
 
-      const isTennis = (b: any) => b.type === 'tennis' || b.type === 'shoes' || b.type === 'calzado' || b.category === 'calzado' || b.category === 'shoes' || b.category === 'tennis' || b.sectionId === 'calzado';
-      const isSocks = (b: any) => b.type === 'socks' || b.type === 'medias' || b.category === 'medias' || b.category === 'socks' || b.sectionId === 'medias';
-      const isSportwear = (b: any) => b.type === 'sportwear' || b.type === 'sportware' || b.type === 'ropa' || b.category === 'sportwear' || b.category === 'sportware' || b.category === 'ropa' || b.sectionId === 'sportwear' || b.sectionId === 'sportware' || (!isTennis(b) && !isSocks(b));
-
-      const tennisBanners = bannersList.filter(isTennis);
-      const socksBanners = bannersList.filter(isSocks);
-      const sportwearBanners = bannersList.filter(isSportwear);
+      const tennisBanners = bannersList.filter(b => isBannerForCategory(b, 'calzado'));
+      const socksBanners = bannersList.filter(b => isBannerForCategory(b, 'medias'));
+      const sportwearBanners = bannersList.filter(b => isBannerForCategory(b, 'sportwear'));
 
       if (configSnap.exists()) {
         const configData = configSnap.data();
