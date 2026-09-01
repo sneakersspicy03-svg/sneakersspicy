@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../constants';
-import { Product, CartItem, BrandStock, FilterState, SportwearCategory, Section } from '../types';
+import { Product, CartItem, BrandStock, FilterState, SportwearCategory, Section, isProductInBanner } from '../types';
 import { syncService, GlobalState, db } from '../services/syncService';
 import { collection, onSnapshot, doc } from 'firebase/firestore';
 import { App as CapApp } from '@capacitor/app';
@@ -371,8 +371,9 @@ const App: React.FC = () => {
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
+    const allBanners = [...tennisBrands, ...socksBrands, ...currentCategories];
     return currentProducts.filter(p => {
-      // Search text filter
+      // Search filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
         const nameMatch = (p.name || '').toLowerCase().includes(q);
@@ -381,8 +382,15 @@ const App: React.FC = () => {
         if (!nameMatch && !brandMatch && !catMatch) return false;
       }
 
-      // Brand filter
-      if (filters.brand) {
+      // Banner / Brand filter
+      if (filters.bannerId) {
+        const targetBanner = allBanners.find(b => b.id === filters.bannerId);
+        if (targetBanner) {
+          if (!isProductInBanner(p, targetBanner, allBanners)) return false;
+        } else if (p.bannerId && p.bannerId !== filters.bannerId) {
+          return false;
+        }
+      } else if (filters.brand) {
         const targetBrand = filters.brand.toLowerCase().trim();
         const pBrand = (p.brand || '').toLowerCase().trim();
         const pMarca = (p.marca || '').toLowerCase().trim();
@@ -391,7 +399,13 @@ const App: React.FC = () => {
 
       // Size filter
       if (filters.size) {
-        if (!p.availableSizes || !p.availableSizes.map(String).includes(String(filters.size))) {
+        let sizeList: string[] = [];
+        if (Array.isArray(p.availableSizes)) sizeList = p.availableSizes.map(String);
+        else if (Array.isArray((p as any).sizes)) sizeList = (p as any).sizes.map(String);
+        else if (typeof (p as any).availableSizes === 'string') sizeList = ((p as any).availableSizes as string).split(',').map((s: string) => s.trim());
+        else if (typeof (p as any).size === 'string') sizeList = [(p as any).size.trim()];
+
+        if (!sizeList.map(s => s.toUpperCase()).includes(String(filters.size).toUpperCase())) {
           return false;
         }
       }
@@ -413,7 +427,7 @@ const App: React.FC = () => {
 
       return true;
     });
-  }, [currentProducts, filters, searchQuery]);
+  }, [currentProducts, filters, searchQuery, tennisBrands, socksBrands, currentCategories]);
 
   // Recommended Products
   const recommendedProducts = useMemo(() => {
@@ -450,36 +464,40 @@ const App: React.FC = () => {
       category: categoryName || null,
       brand: null, // reset brand to show all banners for that category
       size: null,
+      bannerId: null,
     }));
     // Dejar al usuario en la parte superior donde están las marcas y los banners
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSelectBrand = (brandName: string | null) => {
-    if (brandName) {
+  const handleSelectBrand = (brandName: string | null, bannerId?: string) => {
+    if (brandName || bannerId) {
       try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
     }
     setFilters(prev => ({
       ...prev,
-      brand: brandName
+      brand: brandName,
+      bannerId: bannerId || null
     }));
-    if (brandName) {
+    if (brandName || bannerId) {
       document.getElementById('explore-grid')?.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
-  const handleSelectBrandAndSize = (brandName: string, size: number | string) => {
+  const handleSelectBrandAndSize = (brandName: string, size: number | string, category?: string, bannerId?: string) => {
     try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
     setFilters(prev => ({
       ...prev,
       brand: brandName,
-      size: size
+      size: size,
+      category: category || prev.category,
+      bannerId: bannerId || null
     }));
     document.getElementById('explore-grid')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleResetFilters = () => {
-    setFilters({ brand: null, size: null, category: null });
+    setFilters({ brand: null, size: null, category: null, bannerId: null });
     setSearchQuery('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -599,8 +617,8 @@ const App: React.FC = () => {
               onBannerClick={(slide) => {
                 const b = slide?.originalBanner;
                 if (b) {
-                  if (b.name) handleSelectBrand(b.name);
-                  else if (b.brand) handleSelectBrand(b.brand);
+                  const bBrand = b.brand || b.name || '';
+                  handleSelectBrand(bBrand, b.id);
                 }
                 document.getElementById('explore-grid')?.scrollIntoView({ behavior: 'smooth' });
               }}
@@ -645,8 +663,8 @@ const App: React.FC = () => {
               categoryName={filters.category}
               banners={activeCategoryBanners}
               products={currentProducts}
-              onSelectBrand={(brandName) => handleSelectBrand(brandName)}
-              onSelectSize={(brandName, size) => handleSelectBrandAndSize(brandName, size)}
+              onSelectBrand={(brandName, bannerId) => handleSelectBrand(brandName, bannerId)}
+              onSelectSize={(brandName, size, bannerId) => handleSelectBrandAndSize(brandName, size, filters.category || undefined, bannerId)}
               onBack={handleResetFilters}
             />
           ) : null

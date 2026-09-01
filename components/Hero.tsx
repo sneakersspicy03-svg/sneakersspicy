@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { BrandStock, Product } from '../types';
+import { BrandStock, Product, isProductInBanner } from '../types';
 
 interface HeroProps {
   brands: BrandStock[];
@@ -50,28 +49,11 @@ const Hero: React.FC<HeroProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
               const bannerBrand = (brand.brand || (brand as any).nombre || brand.name || brand.bannerTitle || 'MARCA').trim();
-              const bannerBrandNorm = bannerBrand.toLowerCase();
 
-              const normalizeSection = (sec?: string) => {
-                const s = String(sec || '').toLowerCase().trim();
-                if (s.includes('calzado') || s.includes('tenis') || s.includes('shoe') || s.includes('sneaker') || s === 'shoes') return 'calzado';
-                if (s.includes('sportwear') || s.includes('sportware') || s.includes('ropa')) return 'sportwear';
-                if (s.includes('media') || s.includes('sock')) return 'medias';
-                return s;
-              };
+              // 1. Filtrado exacto con isProductInBanner
+              const matchingProducts = products.filter(p => isProductInBanner(p, { ...brand, section: 'calzado' }, brands));
 
-              const bannerSectionNorm = 'calzado';
-
-              // 1. Filtrado estricto por MARCA y SECCIÓN con stock disponible
-              const matchingProducts = products.filter(p => {
-                const pBrand = String(p.brand || p.marca || '').trim().toLowerCase();
-                const pSection = normalizeSection((p as any).section || (p as any).category || (p as any).sectionId);
-                const hasStock = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
-                
-                return pBrand === bannerBrandNorm && pSection === bannerSectionNorm && hasStock;
-              });
-
-              // 2. Extraer tallas de matchingProducts (array de tallas o string único)
+              // 2. Extraer tallas de matchingProducts
               const allSizes = matchingProducts.flatMap(p => {
                 let list: (string | number)[] = [];
                 if (Array.isArray(p.availableSizes) && p.availableSizes.length > 0) {
@@ -120,28 +102,36 @@ const Hero: React.FC<HeroProps> = ({
                     </h3>
                   </div>
 
-                  <div className="absolute inset-0 bg-black/80 backdrop-blur-xl transition-all duration-700 flex flex-col items-center justify-center p-8 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 z-[60]">
-                    <div className="text-center space-y-5 w-full max-w-[280px]">
-                      <span className="text-red-500 text-[9px] font-black uppercase tracking-[0.5em] block">Filtrar por Talla</span>
-                      
+                  {/* Panel Trasero con Tallas */}
+                  <div className="absolute inset-0 bg-black/85 backdrop-blur-xl transition-all duration-700 flex flex-col items-center justify-center p-8 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 z-50">
+                    <div className="text-center space-y-6 w-full max-w-[240px]">
+                      <div className="space-y-2">
+                        <div className="text-red-600 font-black text-6xl italic tracking-tighter">SP</div>
+                        <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">Colección Oficial</p>
+                      </div>
+
+                      {/* Mostrar ÚNICAMENTE tallas disponibles si existen */}
                       {dynamicSizes.length > 0 ? (
-                        <div className="grid grid-cols-3 gap-2.5 w-full mx-auto relative">
+                        <div className="grid grid-cols-3 gap-2.5">
                           {dynamicSizes.map(size => (
                             <button 
                               key={size}
-                              onClick={(e) => { e.stopPropagation(); onSelectSize?.(bannerBrand, size, 'Calzado'); }}
-                              className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-sm font-bold text-white transition-all z-10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectSize?.(bannerBrand, size, 'Calzado');
+                              }}
+                              className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-sm font-bold text-white transition-all shadow-lg"
                             >
                               {size}
                             </button>
                           ))}
                           {isDevMode && (
-                            <button 
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                if(onQuickAdd) onQuickAdd(bannerBrand); 
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onQuickAdd) onQuickAdd(bannerBrand);
                               }}
-                              className="min-w-[40px] h-10 px-2 border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 rounded-xl transition-all cursor-pointer z-[70]"
+                              className="min-w-[40px] h-10 px-2 border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
                             >
                               <span className="text-xl font-bold">+</span>
                             </button>
@@ -149,15 +139,26 @@ const Hero: React.FC<HeroProps> = ({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <button 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              onBrandSelect(brand); 
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onBrandSelect(brand);
                             }}
-                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/40"
+                            className="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-red-900/40"
                           >
                             Ver Colección
                           </button>
+                          {isDevMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onQuickAdd) onQuickAdd(bannerBrand);
+                              }}
+                              className="w-full py-2.5 border-2 border-dashed border-red-500/50 rounded-xl text-red-500 hover:bg-red-500 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+                            >
+                              + Añadir Calzado
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

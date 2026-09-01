@@ -1,12 +1,12 @@
 import React, { useRef } from 'react';
-import { BrandStock, SportwearCategory, Product } from '../types';
+import { BrandStock, SportwearCategory, Product, isProductInBanner } from '../types';
 
 interface CategoryBannersViewProps {
   categoryName: string;
   banners: (BrandStock | SportwearCategory | any)[];
   products: Product[];
-  onSelectBrand: (brandName: string) => void;
-  onSelectSize?: (brandName: string, size: number | string) => void;
+  onSelectBrand: (brandName: string, bannerId?: string) => void;
+  onSelectSize?: (brandName: string, size: number | string, bannerId?: string) => void;
   onBack: () => void;
 }
 
@@ -87,34 +87,23 @@ export const CategoryBannersView: React.FC<CategoryBannersViewProps> = ({
           className="flex space-x-4 sm:space-x-6 overflow-x-auto no-scrollbar pb-4 pt-1 snap-x snap-mandatory scroll-smooth"
         >
           {banners.map((brand) => {
-            const brandName = brand.name || (brand as any).nombre || brand.brand || '';
+            const brandName = brand.brand || brand.name || (brand as any).nombre || '';
             const brandImage = brand.marqueeImage || brand.image || brand.logo || 'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&q=80&w=600';
             
-            // Available sizes for quick filter - Category specific
-            const brandProducts = products.filter(p => {
-              const pBrand = String(p.marca || p.brand || '').trim().toLowerCase();
-              const pCat = String(p.category || '').trim().toLowerCase();
-              const cat = categoryName.toLowerCase();
-              
-              let catMatch = true;
-              if (cat.includes('calzado') || cat.includes('tenis') || cat.includes('shoe') || cat.includes('sneaker')) {
-                catMatch = (pCat.includes('calzado') || pCat.includes('tenis') || pCat.includes('shoe') || pCat.includes('sneaker') || pCat === 'shoes') &&
-                           !pCat.includes('sportwear') && !pCat.includes('ropa') && !pCat.includes('media');
-              } else if (cat.includes('sportwear') || cat.includes('ropa') || cat.includes('apparel')) {
-                catMatch = (pCat.includes('sportwear') || pCat.includes('ropa') || pCat.includes('bermuda') || pCat.includes('licra') || pCat.includes('apparel')) &&
-                           !pCat.includes('calzado') && !pCat.includes('tenis') && !pCat.includes('shoe') && !pCat.includes('media');
-              } else if (cat.includes('media') || cat.includes('sock')) {
-                catMatch = (pCat.includes('media') || pCat.includes('sock')) && !pCat.includes('calzado') && !pCat.includes('sportwear');
-              }
-              
-              return pBrand === brandName.toLowerCase() && catMatch && !p.isSoldOut;
-            });
+            // Available sizes calculated strictly for this exact banner
+            const brandProducts = products.filter(p => isProductInBanner(p, brand, banners));
+            
             const allSizes = brandProducts.flatMap(p => {
+              const rawSizes: (string | number)[] = Array.isArray(p.availableSizes)
+                ? p.availableSizes
+                : (Array.isArray(p.sizes) ? p.sizes : (p.size ? [p.size] : (typeof p.availableSizes === 'string' ? (p.availableSizes as string).split(',') : [])));
               const soldOuts = (p.soldOutSizes || []).map(String);
-              return (p.availableSizes || []).filter(s => !soldOuts.includes(String(s)));
+              return rawSizes.map(String).map(s => s.trim()).filter(s => s && !soldOuts.includes(s));
             });
+
             const isClothing = categoryName.toLowerCase().includes('sportwear') || categoryName.toLowerCase().includes('ropa');
-            const clothingOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL'];
+            const clothingOrder = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'];
+            
             const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => {
               if (isClothing) {
                 const idxA = clothingOrder.indexOf(String(a).toUpperCase());
@@ -123,13 +112,16 @@ export const CategoryBannersView: React.FC<CategoryBannersViewProps> = ({
                 if (idxA !== -1) return -1;
                 if (idxB !== -1) return 1;
               }
+              const numA = Number(a);
+              const numB = Number(b);
+              if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
               return String(a).localeCompare(String(b), undefined, { numeric: true });
             }).slice(0, 6);
 
             return (
               <div
                 key={brand.id || brandName}
-                onClick={() => onSelectBrand(brandName)}
+                onClick={() => onSelectBrand(brandName, brand.id)}
                 className="w-[200px] sm:w-[240px] md:w-[280px] shrink-0 snap-start relative aspect-[9/14] sm:aspect-[9/15] rounded-3xl overflow-hidden bg-zinc-950 border border-white/10 hover:border-red-600/60 shadow-2xl cursor-pointer group transition-all duration-500 active:scale-95 flex flex-col justify-end p-5 sm:p-6"
               >
                 {/* Full Bleed Background Image */}
@@ -170,7 +162,7 @@ export const CategoryBannersView: React.FC<CategoryBannersViewProps> = ({
                           key={size}
                           onClick={(e) => {
                             e.stopPropagation();
-                            onSelectSize ? onSelectSize(brandName, size) : onSelectBrand(brandName);
+                            onSelectSize ? onSelectSize(brandName, size, brand.id) : onSelectBrand(brandName, brand.id);
                           }}
                           className="px-2 py-1 rounded-lg bg-black/60 backdrop-blur-md border border-white/10 hover:bg-red-600 hover:border-red-600 text-[10px] font-black italic text-white transition-colors"
                         >

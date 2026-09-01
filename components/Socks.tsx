@@ -1,14 +1,13 @@
-
 import React from 'react';
-import { BrandStock, Product } from '../types';
+import { BrandStock, Product, isProductInBanner } from '../types';
 
 interface SocksProps {
   brands: BrandStock[];
   products: Product[];
-  onBrandSelect: (brand: string) => void;
+  onBrandSelect: (brand: string, bannerId?: string) => void;
   onQuickAdd?: (brand: string) => void;
   isDevMode?: boolean;
-  onSelectSize?: (brand: string, size: number | string, category: string) => void;
+  onSelectSize?: (brand: string, size: number | string, category: string, bannerId?: string) => void;
   title?: string;
   subtitle?: string;
 }
@@ -33,28 +32,11 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
               const bannerBrand = ((brand as any).brand || (brand as any).nombre || brand.name || brand.bannerTitle || 'MARCA').trim();
-              const bannerBrandNorm = bannerBrand.toLowerCase();
 
-              const normalizeSection = (sec?: string) => {
-                const s = String(sec || '').toLowerCase().trim();
-                if (s.includes('media') || s.includes('sock')) return 'medias';
-                if (s.includes('calzado') || s.includes('tenis') || s.includes('shoe')) return 'calzado';
-                if (s.includes('sportwear') || s.includes('sportware') || s.includes('ropa')) return 'sportwear';
-                return s;
-              };
+              // 1. Filtrado exacto con isProductInBanner
+              const matchingProducts = products.filter(p => isProductInBanner(p, { ...brand, section: 'medias' }, brands));
 
-              const bannerSectionNorm = 'medias';
-
-              // 1. Filtrado estricto por MARCA y SECCIÓN con stock disponible
-              const matchingProducts = products.filter(p => {
-                const pBrand = String(p.brand || p.marca || '').trim().toLowerCase();
-                const pSection = normalizeSection((p as any).section || (p as any).category || (p as any).sectionId);
-                const hasStock = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
-                
-                return pBrand === bannerBrandNorm && pSection === bannerSectionNorm && hasStock;
-              });
-
-              // 2. Extraer tallas de matchingProducts (array de tallas o string único)
+              // 2. Extraer tallas de matchingProducts
               const allSizes = matchingProducts.flatMap(p => {
                 let list: (string | number)[] = [];
                 if (Array.isArray(p.availableSizes) && p.availableSizes.length > 0) {
@@ -76,8 +58,8 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
 
               return (
                 <div
-                  key={brand.name}
-                  onClick={() => onBrandSelect(bannerBrand)}
+                  key={brand.id || brand.name}
+                  onClick={() => onBrandSelect(bannerBrand, brand.id)}
                   className={`relative ${formatClass} rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/50'}`}
                 >
                   <img src={brand.marqueeImage} alt={brand.name} className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110" onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
@@ -98,36 +80,57 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
                         <div className="text-red-600 font-black text-6xl italic tracking-tighter">SP</div>
                         <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">Colección Premium</p>
                       </div>
-                      
-                      <div className="flex flex-col space-y-3 w-full">
-                        {dynamicSizes.length > 0 && (
-                          <div className="grid grid-cols-3 gap-2.5 mb-4">
-                            {dynamicSizes.map(size => (
-                              <button 
-                                key={size} 
-                                onClick={(e) => { e.stopPropagation(); onSelectSize?.(bannerBrand, size, 'Medias'); }} 
-                                className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-sm font-bold text-white transition-all shadow-lg"
-                              >
-                                {size}
-                              </button>
-                            ))}
-                          </div>
-                        )}
 
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onBrandSelect(bannerBrand); }} 
-                          className="w-full py-5 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-zinc-200 transition-all flex items-center justify-center space-x-2 active:scale-95"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                          <span>Explorar Catálogo</span>
-                        </button>
-                        
-                        {isDevMode && (
-                          <button onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(bannerBrand); }} className="w-full py-4 border-2 border-dashed border-red-500 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center space-x-2 active:scale-95">
-                            <span className="text-xl font-bold">+</span><span>Añadir Stock</span>
+                      {dynamicSizes.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-2.5">
+                          {dynamicSizes.map(size => (
+                            <button
+                              key={size}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectSize ? onSelectSize(bannerBrand, size, 'Medias', brand.id) : onBrandSelect(bannerBrand, brand.id);
+                              }}
+                              className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-xs font-bold text-white transition-all shadow-lg"
+                            >
+                              {size}
+                            </button>
+                          ))}
+                          {isDevMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onQuickAdd) onQuickAdd(bannerBrand);
+                              }}
+                              className="min-w-[40px] h-10 px-2 border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                            >
+                              <span className="text-xl font-bold">+</span>
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onBrandSelect(bannerBrand, brand.id);
+                            }}
+                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/40"
+                          >
+                            Ver Colección
                           </button>
-                        )}
-                      </div>
+                          {isDevMode && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onQuickAdd) onQuickAdd(bannerBrand);
+                              }}
+                              className="w-full py-2.5 border-2 border-dashed border-red-500/50 rounded-xl text-red-500 hover:bg-red-500 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+                            >
+                              + Añadir Medias
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -1,13 +1,13 @@
 {
-  "version": "2.2.0",
-  "versionCode": 5,
+  "version": "2.2.1",
+  "versionCode": 6,
   "downloadUrl": "https://github.com/sneakersspicy03-svg/sneakersspicy/raw/app-mobile/sneakers-spicy.apk",
-  "releaseDate": "2026-08-31",
-  "title": "Actualización Sneakers Spicy v2.2.0",
+  "releaseDate": "2026-09-01",
+  "title": "Actualización Sneakers Spicy v2.2.1",
   "changelog": [
-    "Insignias y marcas dinámicas en todos los banners de categorías",
-    "Cálculo estricto de tallas disponibles en hover por sección y marca",
-    "Optimización de rendimiento e interfaz"
+    "Aislamiento estricto de productos y prendas en sus banners",
+    "Separación total entre licras, compresión y bermudas",
+    "Filtro dinámico de tallas exacto por colección"
   ],
   "forceUpdate": false
 }

@@ -1,11 +1,11 @@
 import React from 'react';
-import { SportwearCategory, Product } from '../types';
+import { SportwearCategory, Product, isProductInBanner } from '../types';
 
 interface SportwearProps {
   categories: SportwearCategory[];
   products: Product[];
-  onCategorySelect: (brand: string, category: string) => void;
-  onSelectSize?: (brand: string, size: string, category: string) => void;
+  onCategorySelect: (brand: string, category: string, bannerId?: string) => void;
+  onSelectSize?: (brand: string, size: string, category: string, bannerId?: string) => void;
   onQuickAdd?: (brand: string) => void;
   isDevMode?: boolean;
   title?: string;
@@ -15,7 +15,6 @@ interface SportwearProps {
 const FALLBACK_SPORTWEAR_IMAGE = 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=800';
 
 const CLOTHING_SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'];
-const CLOTHING_SIZES_SET = new Set(['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', 'TALLA ÚNICA', 'UNICA', 'ONE SIZE']);
 
 export const Sportwear: React.FC<SportwearProps> = ({ 
   categories, 
@@ -47,28 +46,11 @@ export const Sportwear: React.FC<SportwearProps> = ({
             {categories.map((cat, index) => {
               const bannerBrand = (cat.brand || cat.name || cat.bannerTitle || 'MARCA').trim();
               const bannerTitle = cat.bannerTitle || cat.name;
-              const bannerBrandNorm = bannerBrand.toLowerCase();
 
-              const normalizeSection = (sec?: string) => {
-                const s = String(sec || '').toLowerCase().trim();
-                if (s.includes('sportwear') || s.includes('sportware') || s.includes('ropa') || s.includes('apparel') || s.includes('prenda')) return 'sportwear';
-                if (s.includes('calzado') || s.includes('tenis') || s.includes('shoe')) return 'calzado';
-                if (s.includes('media') || s.includes('sock')) return 'medias';
-                return s;
-              };
+              // 1. Filtrado exacto de productos para este banner usando isProductInBanner
+              const matchingProducts = products.filter(p => isProductInBanner(p, cat, categories));
 
-              const bannerSectionNorm = normalizeSection((cat as any).section || (cat as any).category || 'sportwear');
-
-              // 1. Filtrar de forma estricta por MARCA y SECCIÓN con stock disponible
-              const matchingProducts = products.filter(p => {
-                const pBrand = String(p.brand || p.marca || '').trim().toLowerCase();
-                const pSection = normalizeSection((p as any).section || (p as any).category || (p as any).sectionId);
-                const hasStock = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
-                
-                return pBrand === bannerBrandNorm && pSection === bannerSectionNorm && hasStock;
-              });
-
-              // 2. Extraer las tallas de matchingProducts (array de tallas o string único)
+              // 2. Extraer tallas reales de matchingProducts
               const allAvailableSizes = matchingProducts.flatMap(p => {
                 let list: (string | number)[] = [];
                 if (Array.isArray(p.availableSizes) && p.availableSizes.length > 0) {
@@ -84,8 +66,12 @@ export const Sportwear: React.FC<SportwearProps> = ({
                 return list.map(s => String(s).trim()).filter(s => s && !soldOuts.includes(s.toUpperCase()));
               });
 
-              // Ordenar tallas lógicamente en formato de ropa
-              const dynamicSizes = Array.from(new Set(allAvailableSizes)).sort((a, b) => {
+              // Ordenar tallas lógicamente en formato de ropa (filtrando números puros de calzado)
+              const dynamicSizes = Array.from(new Set(allAvailableSizes)).filter(size => {
+                const upper = String(size).toUpperCase();
+                if (CLOTHING_SIZE_ORDER.includes(upper)) return true;
+                return isNaN(Number(size));
+              }).sort((a, b) => {
                 const idxA = CLOTHING_SIZE_ORDER.indexOf(String(a).toUpperCase());
                 const idxB = CLOTHING_SIZE_ORDER.indexOf(String(b).toUpperCase());
                 if (idxA !== -1 && idxB !== -1) return idxA - idxB;
@@ -103,7 +89,7 @@ export const Sportwear: React.FC<SportwearProps> = ({
               return (
                 <div
                   key={cat.id || index}
-                  onClick={() => onCategorySelect(targetBrand, targetCategory)}
+                  onClick={() => onCategorySelect(targetBrand, targetCategory, cat.id)}
                   className={`relative ${formatClass} rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
                 >
                   <img 
@@ -143,7 +129,7 @@ export const Sportwear: React.FC<SportwearProps> = ({
                                 key={size} 
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
-                                  onSelectSize?.(targetBrand, String(size), targetCategory); 
+                                  onSelectSize?.(targetBrand, String(size), targetCategory, cat.id); 
                                 }} 
                                 className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-sm font-bold text-white transition-all shadow-lg"
                               >
@@ -164,7 +150,7 @@ export const Sportwear: React.FC<SportwearProps> = ({
                             <button 
                               onClick={(e) => { 
                                 e.stopPropagation(); 
-                                onCategorySelect(targetBrand, targetCategory); 
+                                onCategorySelect(targetBrand, targetCategory, cat.id); 
                               }}
                               className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/40"
                             >
