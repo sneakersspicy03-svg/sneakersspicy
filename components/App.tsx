@@ -20,8 +20,8 @@ import DeveloperMode from './DeveloperMode';
 import AIConsultant from './AIConsultant';
 import AppUpdateModal, { AppUpdateInfo } from './AppUpdateModal';
 
-export const CURRENT_APP_VERSION = "2.2.0";
-export const CURRENT_VERSION_CODE = 5;
+export const CURRENT_APP_VERSION = "2.2.1";
+export const CURRENT_VERSION_CODE = 6;
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
