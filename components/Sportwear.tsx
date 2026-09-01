@@ -14,11 +14,23 @@ interface SportwearProps {
 
 const FALLBACK_SPORTWEAR_IMAGE = 'https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&q=80&w=800';
 
-const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategorySelect, onSelectSize, onQuickAdd, isDevMode = false, title, subtitle }) => {
+const CLOTHING_SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'];
+const CLOTHING_SIZES_SET = new Set(['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', 'TALLA ÚNICA', 'UNICA', 'ONE SIZE']);
+
+export const Sportwear: React.FC<SportwearProps> = ({ 
+  categories, 
+  products, 
+  onCategorySelect, 
+  onSelectSize, 
+  onQuickAdd, 
+  isDevMode = false, 
+  title, 
+  subtitle 
+}) => {
   if (!categories || !Array.isArray(categories) || categories.length === 0) return null;
 
   return (
-    <div id="section-sportwear" className="relative w-full overflow-hidden flex flex-col bg-[#050505] py-24 transition-all duration-700 scroll-mt-28">
+    <div className="relative w-full overflow-hidden flex flex-col bg-[#050505] py-24 transition-all duration-700">
       <div className="relative z-10 w-full max-w-[1600px] mx-auto">
         <div className="px-6 md:px-20 mb-12 space-y-8 animate-fade-in">
           <div className="space-y-2">
@@ -33,28 +45,65 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {categories.map((cat, index) => {
-              const brandName = (cat.brand || 'Nike').toUpperCase();
+              const bannerBrand = (cat.brand || cat.name || cat.bannerTitle || 'MARCA').trim();
               const bannerTitle = cat.bannerTitle || cat.name;
+              const bannerBrandNorm = bannerBrand.toLowerCase();
 
-              // Calcular tallas dinámicas - Filtro por marca y categoría
-              const brandProducts = products.filter(p => {
-                const bName = String(cat.brand || "").trim().toLowerCase();
-                const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
-                const pCat = String(p.category || "").trim().toLowerCase();
-                const cName = String(cat.name || "").trim().toLowerCase();
-                return pBrand === bName && (pCat === cName || pCat.includes('sportwear') || pCat.includes('sportware') || pCat.includes('ropa')) && !p.isSoldOut;
+              const normalizeSection = (sec?: string) => {
+                const s = String(sec || '').toLowerCase().trim();
+                if (s.includes('sportwear') || s.includes('sportware') || s.includes('ropa') || s.includes('apparel') || s.includes('prenda')) return 'sportwear';
+                if (s.includes('calzado') || s.includes('tenis') || s.includes('shoe')) return 'calzado';
+                if (s.includes('media') || s.includes('sock')) return 'medias';
+                return s;
+              };
+
+              const bannerSectionNorm = normalizeSection((cat as any).section || (cat as any).category || 'sportwear');
+
+              // 1. Filtrar de forma estricta por MARCA y SECCIÓN con stock disponible
+              const matchingProducts = products.filter(p => {
+                const pBrand = String(p.brand || p.marca || '').trim().toLowerCase();
+                const pSection = normalizeSection((p as any).section || (p as any).category || (p as any).sectionId);
+                const hasStock = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
+                
+                return pBrand === bannerBrandNorm && pSection === bannerSectionNorm && hasStock;
               });
-              const allSizes = brandProducts.flatMap(p => p.availableSizes || []);
-              const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
-              const displaySizes = dynamicSizes.length > 0 ? dynamicSizes : (cat.availableSizes && cat.availableSizes.length > 0 ? cat.availableSizes : ['S', 'M', 'L', 'XL', 'XXL']);
+
+              // 2. Extraer las tallas de matchingProducts (array de tallas o string único)
+              const allAvailableSizes = matchingProducts.flatMap(p => {
+                let list: (string | number)[] = [];
+                if (Array.isArray(p.availableSizes) && p.availableSizes.length > 0) {
+                  list = p.availableSizes;
+                } else if (Array.isArray((p as any).sizes) && (p as any).sizes.length > 0) {
+                  list = (p as any).sizes;
+                } else if (typeof (p as any).size === 'string' && (p as any).size.trim()) {
+                  list = [(p as any).size.trim()];
+                } else if (typeof p.availableSizes === 'string') {
+                  list = (p.availableSizes as string).split(',').map(s => s.trim());
+                }
+                const soldOuts = ((p.soldOutSizes || (p as any).agotadas || []) as any[]).map(s => String(s).trim().toUpperCase());
+                return list.map(s => String(s).trim()).filter(s => s && !soldOuts.includes(s.toUpperCase()));
+              });
+
+              // Ordenar tallas lógicamente en formato de ropa
+              const dynamicSizes = Array.from(new Set(allAvailableSizes)).sort((a, b) => {
+                const idxA = CLOTHING_SIZE_ORDER.indexOf(String(a).toUpperCase());
+                const idxB = CLOTHING_SIZE_ORDER.indexOf(String(b).toUpperCase());
+                if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                if (idxA !== -1) return -1;
+                if (idxB !== -1) return 1;
+                return String(a).localeCompare(String(b), undefined, { numeric: true });
+              });
 
               const formatClass = cat.format === 'vertical' ? 'aspect-[9/16]' : cat.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
               const bannerImg = cat.image || cat.marqueeImage || FALLBACK_SPORTWEAR_IMAGE;
 
+              const targetBrand = bannerBrand;
+              const targetCategory = 'Sportwear';
+
               return (
                 <div
                   key={cat.id || index}
-                  onClick={() => onCategorySelect(cat.brand || 'Nike', cat.name)}
+                  onClick={() => onCategorySelect(targetBrand, targetCategory)}
                   className={`relative ${formatClass} rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_40px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/40'}`}
                 >
                   <img 
@@ -68,7 +117,7 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
                   {/* Badge Rojo y Textos */}
                   <div className="absolute inset-x-0 bottom-0 p-10 flex flex-col items-start space-y-4 transition-all duration-500 group-hover:opacity-0 group-hover:translate-y-4">
                     <div className="bg-red-600 px-5 py-2 rounded-sm shadow-2xl inline-block transform -skew-x-12">
-                      <span className="text-white text-[10px] font-[1000] uppercase tracking-[0.3em] italic skew-x-12 block">{brandName}</span>
+                      <span className="text-white text-[10px] font-[1000] uppercase tracking-[0.3em] italic skew-x-12 block">{cat.brand || cat.name || cat.bannerTitle || 'MARCA'}</span>
                     </div>
                     <div className="flex flex-col items-start text-left w-full origin-left">
                       {cat.bannerSubtitle && <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-white/40 mb-1 italic">{cat.bannerSubtitle}</span>}
@@ -76,20 +125,61 @@ const Sportwear: React.FC<SportwearProps> = ({ categories, products, onCategoryS
                     </div>
                   </div>
 
-                  <div className="absolute inset-0 bg-black/85 backdrop-blur-3xl transition-all duration-700 flex flex-col items-center justify-center p-10 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 text-center">
-                     <div className="space-y-8 w-full max-w-[280px]">
+                  {/* Overlay al hacer Hover */}
+                  <div className="absolute inset-0 bg-black/85 backdrop-blur-3xl transition-all duration-700 flex flex-col items-center justify-center p-10 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 text-center z-50">
+                     <div className="space-y-6 w-full max-w-[280px]">
                         <div className="space-y-2">
                           <div className="text-red-600 font-black text-6xl italic tracking-tighter">SP</div>
-                          <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">Seleccionar Talla</p>
+                          <p className="font-black uppercase tracking-[0.4em] text-[9px] italic text-zinc-500">
+                            {dynamicSizes.length > 0 ? 'Seleccionar Talla' : 'Colección Sportwear'}
+                          </p>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                          {displaySizes.map(size => (
-                            <button key={size} onClick={(e) => { e.stopPropagation(); onSelectSize?.(cat.brand || 'Nike', String(size), cat.name); }} className="aspect-square rounded-2xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white transition-all text-sm font-black italic">{size}</button>
-                          ))}
-                          {isDevMode && (
-                            <button onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(cat.brand || 'Nike'); }} className="aspect-square rounded-2xl border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"><span className="text-xl font-bold">+</span></button>
-                          )}
-                        </div>
+
+                        {/* Mostrar ÚNICAMENTE tallas disponibles si existen */}
+                        {dynamicSizes.length > 0 ? (
+                          <div className="grid grid-cols-3 gap-2.5">
+                            {dynamicSizes.map(size => (
+                              <button 
+                                key={size} 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  onSelectSize?.(targetBrand, String(size), targetCategory); 
+                                }} 
+                                className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-sm font-bold text-white transition-all shadow-lg"
+                              >
+                                {size}
+                              </button>
+                            ))}
+                            {isDevMode && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(targetBrand); }} 
+                                className="min-w-[40px] h-10 px-2 border-2 border-dashed border-red-500/50 flex items-center justify-center bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                              >
+                                <span className="text-xl font-bold">+</span>
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <button 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                onCategorySelect(targetBrand, targetCategory); 
+                              }}
+                              className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-red-900/40"
+                            >
+                              Ver Colección
+                            </button>
+                            {isDevMode && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(targetBrand); }} 
+                                className="w-full py-2.5 border-2 border-dashed border-red-500/50 rounded-xl text-red-500 hover:bg-red-500 hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+                              >
+                                + Añadir Pieza a este Banner
+                              </button>
+                            )}
+                          </div>
+                        )}
                      </div>
                   </div>
                 </div>

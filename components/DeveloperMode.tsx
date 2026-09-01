@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Product, ProductImages, SportwearCategory, ProductCondition, BrandStock, Section, SizeInputType, BannerFormat } from '../types';
 import { doc, updateDoc, setDoc, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { syncService, db } from '../services/syncService';
-import { validateProductPayload, validateBannerPayload, sanitizeString } from '../services/securityUtils';
 
 interface DeveloperModeProps {
   logo?: string | null;
@@ -288,14 +288,9 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
       isSoldOut: newProduct.stock === 0
     };
 
-    const validation = validateProductPayload(productToSave);
-    if (!validation.isValid) {
-      return alert(`⚠️ Errores de Validación:\n• ${validation.errors.join('\n• ')}`);
-    }
-
     setIsSaving(true);
     try {
-      const confirmedProduct = await syncService.saveProduct(validation.sanitizedData);
+      const confirmedProduct = await syncService.saveProduct(productToSave);
       if (editingProductId) {
         await onUpdateProduct(confirmedProduct);
         alert(`✅ ¡Actualizado! "${confirmedProduct.name}" ha sido guardado.`);
@@ -317,23 +312,13 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
 
   const handleSaveSection = async (e?: React.MouseEvent) => {
     e?.preventDefault();
+    if (!newSectionData.name.trim()) return alert("⚠️ El nombre de la sección es obligatorio.");
     try {
-      const sanitizedSection = {
-        name: sanitizeString(newSectionData.name, 60),
-        subtitle: sanitizeString(newSectionData.subtitle, 120),
-        emoji: sanitizeString(newSectionData.emoji, 10) || '👟',
-        photoCount: Number(newSectionData.photoCount) || 6,
-        sizeInputType: newSectionData.sizeInputType || 'numeric',
-        imageUrl: newSectionData.imageUrl || ''
-      };
-
-      if (!sanitizedSection.name) return alert("⚠️ El nombre de la sección es obligatorio.");
-
       if (editingSection) {
-        await onUpdateSection({ ...editingSection, ...sanitizedSection });
+        await onUpdateSection({ ...editingSection, ...newSectionData });
         setEditingSection(null);
       } else {
-        await onAddSection({ ...sanitizedSection, orderIndex: sections.length });
+        await onAddSection({ ...newSectionData, orderIndex: sections.length });
       }
       setShowAddSectionForm(false);
       setNewSectionData({ name: '', subtitle: '', emoji: '👟', photoCount: 6, sizeInputType: 'numeric', imageUrl: '' });
@@ -344,36 +329,17 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
   };
 
   const handleSaveNewBanner = async () => {
-    let sizes: (string | number)[] = [];
-    if (showAddBannerForm.section === 'Calzado') sizes = [7, 8, 9, 10, 11, 12];
-    else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
-    else sizes = ['Talla Única'];
-
-    const bannerCandidate = {
-      name: newBannerData.name || newBannerData.title,
-      marqueeImage: newBannerData.image,
-      image: newBannerData.image,
-      bannerTitle: newBannerData.title,
-      bannerSubtitle: newBannerData.subtitle,
-      availableSizes: sizes,
-      format: newBannerData.format,
-      section: showAddBannerForm.section || 'Calzado',
-      sectionName: showAddBannerForm.section || 'Calzado',
-      category: (showAddBannerForm.section || 'Calzado').toLowerCase(),
-      type: showAddBannerForm.section === 'Calzado' ? 'tennis' : showAddBannerForm.section === 'Medias' ? 'socks' : 'sportwear'
-    };
-
-    const validation = validateBannerPayload(bannerCandidate);
-    if (!validation.isValid) {
-      return alert(`⚠️ Error de Validación:\n• ${validation.errors.join('\n• ')}`);
-    }
-
+    if (!newBannerData.title || !newBannerData.image) return alert("⚠️ Datos faltantes (Título Blanco e Imagen).");
     setIsSaving(true);
     try {
-      const common = validation.sanitizedData;
-      if (showAddBannerForm.section === 'Calzado') await onAddTennisBrand({ ...common, logo: (common.name || common.bannerTitle)[0] });
-      else if (showAddBannerForm.section === 'Medias') await onAddSocksBrand({ ...common, logo: (common.name || common.bannerTitle)[0] });
-      else if (showAddBannerForm.section === 'Sportwear') await onAddCategory({ ...common, brand: newBannerData.brand || 'Nike', image: common.image });
+      let sizes: (string | number)[] = [];
+      if (showAddBannerForm.section === 'Calzado') sizes = [7, 8, 9, 10, 11, 12];
+      else if (showAddBannerForm.section === 'Sportwear') sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+      else sizes = ['Talla Única'];
+      const common = { name: newBannerData.name || newBannerData.title, marqueeImage: newBannerData.image, bannerTitle: newBannerData.title, bannerSubtitle: newBannerData.subtitle, availableSizes: sizes, format: newBannerData.format };
+      if (showAddBannerForm.section === 'Calzado') await onAddTennisBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
+      else if (showAddBannerForm.section === 'Medias') await onAddSocksBrand({ ...common, logo: (newBannerData.name || newBannerData.title)[0] });
+      else if (showAddBannerForm.section === 'Sportwear') await onAddCategory({ ...common, brand: newBannerData.brand || newBannerData.title || newBannerData.name || 'Sportwear', image: newBannerData.image });
       setShowAddBannerForm({section: null}); 
       setNewBannerData({name: '', title: '', subtitle: '', image: '', brand: '', format: 'horizontal' });
     } catch (e: any) { alert(`Error: ${e.message}`); } finally { setIsSaving(false); }
@@ -394,24 +360,16 @@ const DeveloperMode: React.FC<DeveloperModeProps> = ({
         image: editingBanner.data.image || editingBanner.data.marqueeImage || '',
         format: editingBanner.data.format || 'horizontal',
         type: editingBanner.type,
-        section: editingBanner.data.section || (editingBanner.type === 'tennis' ? 'Calzado' : editingBanner.type === 'socks' ? 'Medias' : 'Sportwear'),
-        sectionName: editingBanner.data.sectionName || (editingBanner.type === 'tennis' ? 'Calzado' : editingBanner.type === 'socks' ? 'Medias' : 'Sportwear'),
-        category: editingBanner.data.category || (editingBanner.type === 'tennis' ? 'calzado' : editingBanner.type === 'socks' ? 'medias' : 'sportwear'),
         lastUpdated: Date.now()
       };
 
-      const validation = validateBannerPayload(updatedData);
-      if (!validation.isValid) {
-        return alert(`⚠️ Error de Validación:\n• ${validation.errors.join('\n• ')}`);
-      }
-
       const bannerRef = doc(db, 'banners', bannerId);
-      await setDoc(bannerRef, validation.sanitizedData, { merge: true });
+      await setDoc(bannerRef, updatedData, { merge: true });
 
       // Sincronizar estado local
-      if (editingBanner.type === 'tennis') await onUpdateTennisBrand(validation.sanitizedData);
-      else if (editingBanner.type === 'socks') await onUpdateSocksBrand(validation.sanitizedData);
-      else if (editingBanner.type === 'sportwear') await onUpdateCategory(validation.sanitizedData);
+      if (editingBanner.type === 'tennis') await onUpdateTennisBrand(updatedData);
+      else if (editingBanner.type === 'socks') await onUpdateSocksBrand(updatedData);
+      else if (editingBanner.type === 'sportwear') await onUpdateCategory(updatedData);
 
       setEditingBanner(null);
       alert("✅ Banner actualizado exitosamente en base de datos.");

@@ -17,7 +17,7 @@ const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1586350977771-b3b0abd5
 
 const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickAdd, isDevMode = false, onSelectSize, title, subtitle }) => {
   return (
-    <div id="section-medias" className="relative w-full overflow-hidden flex flex-col bg-[#020202] py-24 transition-all duration-700 scroll-mt-28">
+    <div className="relative w-full overflow-hidden flex flex-col bg-[#020202] py-24 transition-all duration-700">
       <div className="relative z-10 w-full max-w-[1600px] mx-auto">
         <div className="px-6 md:px-20 mb-12 space-y-8 animate-fade-in">
           <div className="space-y-2">
@@ -32,13 +32,44 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
         <div className="px-6 md:px-20">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {brands.map((brand) => {
-              // Calcular tallas dinámicas - REPARADO: Filtro por marca insensible y flexible
-              const brandProducts = products.filter(p => {
-                const bName = String((brand as any).nombre || brand.name || "").trim().toLowerCase();
-                const pBrand = String(p.marca || p.brand || "").trim().toLowerCase();
-                return pBrand === bName && p.category === 'Medias' && !p.isSoldOut;
+              const bannerBrand = ((brand as any).brand || (brand as any).nombre || brand.name || brand.bannerTitle || 'MARCA').trim();
+              const bannerBrandNorm = bannerBrand.toLowerCase();
+
+              const normalizeSection = (sec?: string) => {
+                const s = String(sec || '').toLowerCase().trim();
+                if (s.includes('media') || s.includes('sock')) return 'medias';
+                if (s.includes('calzado') || s.includes('tenis') || s.includes('shoe')) return 'calzado';
+                if (s.includes('sportwear') || s.includes('sportware') || s.includes('ropa')) return 'sportwear';
+                return s;
+              };
+
+              const bannerSectionNorm = 'medias';
+
+              // 1. Filtrado estricto por MARCA y SECCIÓN con stock disponible
+              const matchingProducts = products.filter(p => {
+                const pBrand = String(p.brand || p.marca || '').trim().toLowerCase();
+                const pSection = normalizeSection((p as any).section || (p as any).category || (p as any).sectionId);
+                const hasStock = !p.isSoldOut && (p.stock === undefined || p.stock > 0);
+                
+                return pBrand === bannerBrandNorm && pSection === bannerSectionNorm && hasStock;
               });
-              const allSizes = brandProducts.flatMap(p => p.availableSizes);
+
+              // 2. Extraer tallas de matchingProducts (array de tallas o string único)
+              const allSizes = matchingProducts.flatMap(p => {
+                let list: (string | number)[] = [];
+                if (Array.isArray(p.availableSizes) && p.availableSizes.length > 0) {
+                  list = p.availableSizes;
+                } else if (Array.isArray((p as any).sizes) && (p as any).sizes.length > 0) {
+                  list = (p as any).sizes;
+                } else if (typeof (p as any).size === 'string' && (p as any).size.trim()) {
+                  list = [(p as any).size.trim()];
+                } else if (typeof p.availableSizes === 'string') {
+                  list = (p.availableSizes as string).split(',').map(s => s.trim());
+                }
+                const soldOuts = ((p.soldOutSizes || (p as any).agotadas || []) as any[]).map(String);
+                return list.map(s => String(s).trim()).filter(s => s && !soldOuts.includes(s.toUpperCase()));
+              });
+
               const dynamicSizes = Array.from(new Set(allSizes)).sort((a, b) => String(a).localeCompare(String(b)));
 
               const formatClass = brand.format === 'vertical' ? 'aspect-[9/16]' : brand.format === 'rectangular' ? 'aspect-[21/9] lg:col-span-2' : 'aspect-video';
@@ -46,13 +77,17 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
               return (
                 <div
                   key={brand.name}
-                  onClick={() => onBrandSelect(brand.name)}
+                  onClick={() => onBrandSelect(bannerBrand)}
                   className={`relative ${formatClass} rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-2xl border transition-all duration-500 group bg-zinc-900 cursor-pointer ${isDevMode ? 'border-red-500/40 shadow-[0_0_30px_rgba(239,68,68,0.1)]' : 'border-white/5 hover:border-red-600/50'}`}
                 >
                   <img src={brand.marqueeImage} alt={brand.name} className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-110" onError={(e) => { (e.target as HTMLImageElement).src = FALLBACK_IMAGE; }} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
                   
+                  {/* Badge Rojo Dinámico y Textos */}
                   <div className="absolute inset-x-0 bottom-10 px-10 space-y-3 transition-all duration-500 group-hover:opacity-0 group-hover:translate-y-4">
+                    <div className="bg-red-600 px-4 py-1.5 rounded-sm shadow-2xl inline-block transform -skew-x-12">
+                      <span className="text-white text-[10px] font-[1000] uppercase tracking-[0.3em] italic skew-x-12 block">{bannerBrand}</span>
+                    </div>
                     {brand.bannerSubtitle && <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 italic">{brand.bannerSubtitle}</span>}
                     <h3 className="text-[40px] md:text-[50px] font-black italic uppercase tracking-tighter text-white leading-none drop-shadow-2xl">{brand.bannerTitle || brand.name}</h3>
                   </div>
@@ -65,13 +100,13 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
                       </div>
                       
                       <div className="flex flex-col space-y-3 w-full">
-                        {onSelectSize && dynamicSizes.length > 0 && (
-                          <div className="grid grid-cols-4 gap-2 mb-4">
+                        {dynamicSizes.length > 0 && (
+                          <div className="grid grid-cols-3 gap-2.5 mb-4">
                             {dynamicSizes.map(size => (
                               <button 
-                                key={size}
-                                onClick={(e) => { e.stopPropagation(); onSelectSize(brand.name, size, 'Medias'); }}
-                                className="aspect-square rounded-xl border border-white/10 flex items-center justify-center bg-white/5 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all text-[11px] font-black italic"
+                                key={size} 
+                                onClick={(e) => { e.stopPropagation(); onSelectSize?.(bannerBrand, size, 'Medias'); }} 
+                                className="min-w-[40px] h-10 px-2 flex items-center justify-center bg-white/10 hover:bg-red-600 border border-white/20 rounded-xl text-sm font-bold text-white transition-all shadow-lg"
                               >
                                 {size}
                               </button>
@@ -80,7 +115,7 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
                         )}
 
                         <button 
-                          onClick={(e) => { e.stopPropagation(); onBrandSelect(brand.name); }}
+                          onClick={(e) => { e.stopPropagation(); onBrandSelect(bannerBrand); }} 
                           className="w-full py-5 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-zinc-200 transition-all flex items-center justify-center space-x-2 active:scale-95"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -88,7 +123,7 @@ const Socks: React.FC<SocksProps> = ({ brands, products, onBrandSelect, onQuickA
                         </button>
                         
                         {isDevMode && (
-                          <button onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(brand.name); }} className="w-full py-4 border-2 border-dashed border-red-500 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center space-x-2 active:scale-95">
+                          <button onClick={(e) => { e.stopPropagation(); if(onQuickAdd) onQuickAdd(bannerBrand); }} className="w-full py-4 border-2 border-dashed border-red-500 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center space-x-2 active:scale-95">
                             <span className="text-xl font-bold">+</span><span>Añadir Stock</span>
                           </button>
                         )}

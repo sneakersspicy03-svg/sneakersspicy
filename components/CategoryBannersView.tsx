@@ -146,8 +146,15 @@ export const CategoryBannersView: React.FC<CategoryBannersViewProps> = ({
 
                 {/* Brand Details at Bottom */}
                 <div className="relative z-10 space-y-1.5 transform transition-transform duration-300 group-hover:-translate-y-2">
+                  {/* Dynamic Red Brand Badge */}
+                  <div className="bg-red-600 px-3.5 py-1 rounded-sm shadow-2xl inline-block transform -skew-x-12 mb-1 self-start">
+                    <span className="text-white text-[9px] font-[1000] uppercase tracking-[0.3em] italic skew-x-12 block">
+                      {brand.brand || brand.name || (brand as any).nombre || (brand as any).bannerTitle || 'MARCA'}
+                    </span>
+                  </div>
+
                   {brand.bannerSubtitle && (
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500/90 block drop-shadow">
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50 block drop-shadow">
                       {brand.bannerSubtitle}
                     </span>
                   )}

@@ -36,8 +36,9 @@ export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
   const slides: PromoSlide[] = validBanners.map((b, idx) => {
     const rawImage = b.marqueeImage || (b as any).image || b.logo || '';
     const title = b.bannerTitle || b.name || (b as any).title || 'Colección Especial';
-    const badge = b.bannerSubtitle || (b as any).subtitle || (b.brand ? b.brand.toUpperCase() : 'SPICY VAULT');
-    const subtitle = b.brand ? `Explora toda la línea exclusiva de ${b.brand}` : 'Disponibilidad inmediata en Spicy Vault';
+    const brandName = (b.brand || b.name || (b as any).nombre || (b as any).title || 'SPICY VAULT').trim();
+    const badge = brandName.toUpperCase();
+    const subtitle = b.bannerSubtitle || (b.brand ? `Explora toda la línea exclusiva de ${b.brand}` : 'Disponibilidad inmediata en Spicy Vault');
 
     return {
       id: b.id || `banner-${idx}`,
@@ -133,9 +134,11 @@ export const StockXHeroBanner: React.FC<StockXHeroBannerProps> = ({
           {/* Badge */}
           {activeSlide.badge && (
             <div className="flex items-center space-x-2">
-              <span className="inline-block px-3 py-1 rounded-md text-[10px] md:text-[11px] font-black tracking-widest uppercase bg-black/70 text-red-500 border border-red-500/40 backdrop-blur-md shadow-md">
-                {activeSlide.badge}
-              </span>
+              <div className="bg-red-600 px-4 py-1.5 rounded-sm shadow-2xl inline-block transform -skew-x-12">
+                <span className="text-white text-[10px] md:text-[11px] font-[1000] tracking-[0.3em] uppercase italic skew-x-12 block">
+                  {activeSlide.badge}
+                </span>
+              </div>
             </div>
           )}
 
