@@ -33,15 +33,15 @@ export const StockXProductCard: React.FC<StockXProductCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className="group relative flex flex-col bg-[#0D0D0F] rounded-2xl border border-white/10 hover:border-red-600/60 transition-all duration-300 cursor-pointer overflow-hidden p-3 hover:shadow-2xl hover:shadow-red-950/20 select-none w-full active:scale-[0.98]"
+      className="group relative flex flex-col bg-[#0D0D0F] rounded-2xl border border-white/10 hover:border-red-600/60 transition-all duration-300 cursor-pointer overflow-hidden p-2 sm:p-3 hover:shadow-2xl hover:shadow-red-950/20 select-none w-full active:scale-[0.98]"
     >
       {/* Product Image Container */}
-      <div className="relative aspect-square w-full flex items-center justify-center bg-zinc-900/60 rounded-xl p-1.5 sm:p-2 overflow-hidden mb-2 border border-white/5">
+      <div className="relative aspect-square w-full flex items-center justify-center bg-zinc-900/60 rounded-xl p-0.5 overflow-hidden mb-2 border border-white/5">
         <img
           src={product.image}
           alt={product.name}
           loading="lazy"
-          className="w-full h-full object-contain max-h-[85%] drop-shadow-2xl transition-transform duration-300 group-hover:scale-105"
+          className="w-full h-full object-contain scale-125 sm:scale-120 drop-shadow-2xl transition-transform duration-300 group-hover:scale-135"
         />
         {isSoldOut && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-[1px] flex items-center justify-center">

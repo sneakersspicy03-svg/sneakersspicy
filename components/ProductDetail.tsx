@@ -153,13 +153,13 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
         </button>
 
         {/* Left Column: Image Gallery */}
-        <div className="w-full md:w-1/2 bg-black/80 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-white/10 p-4 sm:p-8 justify-between">
-          <div className="w-full h-72 sm:h-80 flex items-center justify-center overflow-hidden py-2">
+        <div className="w-full md:w-1/2 bg-black/80 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-white/10 p-3 sm:p-6 md:p-8 justify-between">
+          <div className="w-full h-72 sm:h-84 md:h-96 flex items-center justify-center overflow-hidden py-1">
             <img 
               src={activeImage} 
               crossOrigin="anonymous"
               loading="eager"
-              className="max-h-full max-w-full object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-105" 
+              className="max-h-full max-w-full w-full h-full object-contain scale-110 sm:scale-120 drop-shadow-2xl transition-transform duration-500 hover:scale-125" 
               alt={product.name} 
             />
           </div>
