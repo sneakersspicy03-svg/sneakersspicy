@@ -4,6 +4,7 @@ import { BrandStock, SportwearCategory, Product } from '../types';
 interface StockXBrandPillsProps {
   brands?: (BrandStock | SportwearCategory | any)[];
   products?: Product[];
+  currentSection?: string;
   selectedBrand: string | null;
   onSelectBrand: (brandName: string | null) => void;
   onBack?: () => void;
@@ -12,24 +13,40 @@ interface StockXBrandPillsProps {
 export const StockXBrandPills: React.FC<StockXBrandPillsProps> = ({
   brands = [],
   products = [],
+  currentSection,
   selectedBrand,
   onSelectBrand,
   onBack,
 }) => {
-  // Extraemos dinámicamente y de forma 100% real todas las marcas únicas
+  // Extraemos dinámicamente y de forma 100% real todas las marcas únicas filtradas por sección activa
   const allBrandNames = useMemo(() => {
     const rawNames: string[] = [];
 
-    // 1. Extraer nombres de banners personalizados
+    // 1. Extraer nombres de banners correspondientes
     brands.forEach(b => {
-      const name = b.name || (b as any).nombre || b.brand;
+      const name = b.brand || b.name || (b as any).nombre;
       if (name && typeof name === 'string' && name.trim()) {
         rawNames.push(name.trim());
       }
     });
 
-    // 2. Extraer marcas de los productos existentes en el inventario
-    products.forEach(p => {
+    // 2. Extraer marcas de los productos (filtrando por currentSection si está definida)
+    const targetProducts = currentSection
+      ? products.filter(p => {
+          const sec = ((p as any).section || p.category || '').toLowerCase().trim();
+          const target = currentSection.toLowerCase().trim();
+          if (target === 'calzado' || target === 'sneakers' || target === 'shoes') {
+            return sec.includes('calzado') || sec.includes('tenis') || sec.includes('shoes') || sec.includes('sneaker');
+          } else if (target === 'sportwear' || target === 'apparel' || target === 'ropa') {
+            return sec.includes('sportwear') || sec.includes('ropa') || sec.includes('apparel') || sec.includes('bermuda') || sec.includes('licra');
+          } else if (target === 'medias' || target === 'socks') {
+            return sec.includes('media') || sec.includes('sock');
+          }
+          return sec.includes(target);
+        })
+      : products;
+
+    targetProducts.forEach(p => {
       const brand = p.brand || (p as any).marca;
       if (brand && typeof brand === 'string' && brand.trim()) {
         rawNames.push(brand.trim());
@@ -49,7 +66,7 @@ export const StockXBrandPills: React.FC<StockXBrandPillsProps> = ({
     return Array.from(brandMap.values()).sort((a, b) =>
       a.localeCompare(b, undefined, { sensitivity: 'base' })
     );
-  }, [brands, products]);
+  }, [brands, products, currentSection]);
 
   // Si no hay marcas reales y no hay filtro activo, no mostramos el contenedor
   if (allBrandNames.length === 0 && !selectedBrand) {

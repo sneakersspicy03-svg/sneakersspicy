@@ -1,8 +1,9 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, setDoc } = require('firebase/firestore');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyCVAqfHuvTVBxz2njeWKj5Sri1ETURP14I",
@@ -13,6 +14,8 @@ const firebaseConfig = {
   appId: "1:362351464666:web:09df3f0104784a2764d5e3"
 };
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 const APP_TSX = path.join(ROOT_DIR, 'components/App.tsx');
 const BUILD_GRADLE = path.join(ROOT_DIR, 'android/app/build.gradle');

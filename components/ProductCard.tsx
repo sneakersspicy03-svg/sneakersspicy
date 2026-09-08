@@ -15,14 +15,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onClick
 
   return (
     <div 
-      className={`group relative bg-zinc-950 rounded-[2.5rem] border border-white/5 overflow-hidden transition-all duration-500 hover:border-red-600/50 cursor-pointer ${isAllSoldOut ? 'opacity-60 grayscale' : ''}`}
+      className={`group relative bg-zinc-950 rounded-2xl md:rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 hover:border-red-600/50 cursor-pointer ${isAllSoldOut ? 'opacity-60 grayscale' : ''} active:scale-[0.98] shadow-md hover:shadow-red-950/20`}
       onClick={onClick}
     >
       {/* Imagen del Producto */}
-      <div className="relative aspect-[4/5] overflow-hidden">
+      <div className="relative aspect-[4/3] w-full flex items-center justify-center bg-zinc-900/60 rounded-xl p-1.5 sm:p-2 overflow-hidden border-b border-white/5">
         {isAllSoldOut && (
-          <div className="absolute inset-0 z-40 bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
-            <span className="text-xl font-black italic uppercase tracking-tighter text-white border-y-2 border-red-600 px-4 py-1 rotate-[-5deg]">
+          <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-[1px] flex items-center justify-center">
+            <span className="text-sm sm:text-base font-black italic uppercase tracking-tighter text-red-500 border border-red-500/60 px-3 py-0.5 rounded shadow-lg rotate-[-5deg]">
               AGOTADO
             </span>
           </div>
@@ -30,23 +30,24 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onClick
         <img 
           src={product.image} 
           alt={product.name} 
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+          loading="lazy"
+          className="w-full h-full object-contain filter drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] transition-transform duration-500 group-hover:scale-105" 
         />
-        <div className="absolute top-5 left-5">
-          <span className="px-3 py-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded shadow-lg italic">
+        <div className="absolute top-2.5 left-2.5">
+          <span className="px-2.5 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded shadow-lg italic">
             {product.brand}
           </span>
         </div>
       </div>
 
       {/* Información Básica */}
-      <div className="p-6 pb-8">
-        <div className="flex justify-between items-start gap-4">
-          <h3 className="font-bold text-[14px] tracking-tight uppercase leading-tight text-white group-hover:text-red-500 transition-colors">
+      <div className="p-3 sm:p-4">
+        <div className="flex flex-col justify-between gap-1.5">
+          <h3 className="font-bold text-[13px] sm:text-[14px] tracking-tight uppercase leading-tight text-white group-hover:text-red-500 transition-colors line-clamp-2 min-h-[34px]">
             {product.name}
           </h3>
-          <p className="font-black italic text-base tracking-tighter text-red-600 whitespace-nowrap">
-            RD${product.price}
+          <p className="font-black italic text-base sm:text-lg tracking-tighter text-red-600 whitespace-nowrap">
+            RD${Number(product.price).toLocaleString()}
           </p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { PRODUCTS, TENNIS_BRANDS, SOCKS_BRANDS, SPORTWEAR_CATEGORIES } from '../constants';
 import { Product, CartItem, BrandStock, FilterState, SportwearCategory, Section, isProductInBanner } from '../types';
 import { syncService, GlobalState, db } from '../services/syncService';
@@ -20,8 +20,8 @@ import DeveloperMode from './DeveloperMode';
 import AIConsultant from './AIConsultant';
 import AppUpdateModal, { AppUpdateInfo } from './AppUpdateModal';
 
-export const CURRENT_APP_VERSION = "2.2.1";
-export const CURRENT_VERSION_CODE = 6;
+export const CURRENT_APP_VERSION = "2.2.2";
+export const CURRENT_VERSION_CODE = 7;
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +35,7 @@ const App: React.FC = () => {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({ brand: null, size: null, category: null });
+  const scrollPosRef = useRef(0);
   
   // Wishlist State (persisted in localStorage)
   const [wishlistIds, setWishlistIds] = useState<string[]>(() => {
@@ -286,7 +287,9 @@ const App: React.FC = () => {
       // 10. Si hay una categoría seleccionada -> Limpiar categoría para regresar a la vista Home principal
       if (filters.category) {
         setFilters({ brand: null, size: null, category: null });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: scrollPosRef.current, behavior: 'instant' });
+        });
         return true;
       }
 
@@ -457,7 +460,25 @@ const App: React.FC = () => {
     return allBanners.filter(b => isBannerForCategory(b, filters.category));
   }, [filters.category, tennisBrands, socksBrands, currentCategories]);
 
+  // Products filtered strictly by current category/section
+  const currentSectionProducts = useMemo(() => {
+    if (!filters.category) return currentProducts;
+    const catLower = filters.category.toLowerCase().trim();
+    return currentProducts.filter(p => {
+      const pCat = ((p as any).section || p.category || '').toLowerCase().trim();
+      if (catLower === 'calzado' || catLower === 'sneakers' || catLower === 'shoes') {
+        return pCat.includes('calzado') || pCat.includes('tenis') || pCat.includes('shoes') || pCat.includes('sneaker');
+      } else if (catLower === 'sportwear' || catLower === 'ropa' || catLower === 'apparel') {
+        return pCat.includes('sportwear') || pCat.includes('ropa') || pCat.includes('apparel') || pCat.includes('bermuda') || pCat.includes('licra');
+      } else if (catLower === 'medias' || catLower === 'socks') {
+        return pCat.includes('media') || pCat.includes('sock');
+      }
+      return pCat === catLower || pCat.includes(catLower);
+    });
+  }, [currentProducts, filters.category]);
+
   const handleSelectCategory = (categoryName: string) => {
+    scrollPosRef.current = window.scrollY;
     try { window.history.pushState({ appNav: true }, ''); } catch (e) {}
     setFilters(prev => ({
       ...prev,
@@ -468,6 +489,14 @@ const App: React.FC = () => {
     }));
     // Dejar al usuario en la parte superior donde están las marcas y los banners
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackFromCategory = () => {
+    setFilters({ brand: null, size: null, category: null, bannerId: null });
+    setSearchQuery('');
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollPosRef.current, behavior: 'instant' });
+    });
   };
 
   const handleSelectBrand = (brandName: string | null, bannerId?: string) => {
@@ -497,9 +526,16 @@ const App: React.FC = () => {
   };
 
   const handleResetFilters = () => {
+    const wasInCategory = !!filters.category;
     setFilters({ brand: null, size: null, category: null, bannerId: null });
     setSearchQuery('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (wasInCategory) {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollPosRef.current, behavior: 'instant' });
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleOpenProduct = (p: Product) => {
@@ -662,10 +698,10 @@ const App: React.FC = () => {
             <CategoryBannersView 
               categoryName={filters.category}
               banners={activeCategoryBanners}
-              products={currentProducts}
+              products={currentSectionProducts}
               onSelectBrand={(brandName, bannerId) => handleSelectBrand(brandName, bannerId)}
               onSelectSize={(brandName, size, bannerId) => handleSelectBrandAndSize(brandName, size, filters.category || undefined, bannerId)}
-              onBack={handleResetFilters}
+              onBack={handleBackFromCategory}
             />
           ) : null
         )}
@@ -677,11 +713,12 @@ const App: React.FC = () => {
           {isFilteringActive && (
             <div className="mb-4">
               <StockXBrandPills 
-                brands={[...tennisBrands, ...socksBrands, ...currentCategories]}
-                products={currentProducts}
+                brands={filters.category ? activeCategoryBanners : [...tennisBrands, ...socksBrands, ...currentCategories]}
+                products={filters.category ? currentSectionProducts : currentProducts}
+                currentSection={filters.category || undefined}
                 selectedBrand={filters.brand}
                 onSelectBrand={handleSelectBrand}
-                onBack={handleResetFilters}
+                onBack={filters.category && !filters.brand ? handleBackFromCategory : handleResetFilters}
               />
             </div>
           )}
