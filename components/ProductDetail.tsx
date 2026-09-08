@@ -154,12 +154,12 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
 
         {/* Left Column: Image Gallery */}
         <div className="w-full md:w-1/2 bg-black/80 flex flex-col shrink-0 border-b md:border-b-0 md:border-r border-white/10 p-4 sm:p-8 justify-between">
-          <div className="flex-1 flex items-center justify-center min-h-[220px] sm:min-h-[300px] overflow-hidden py-4">
+          <div className="w-full h-72 sm:h-80 flex items-center justify-center overflow-hidden py-2">
             <img 
               src={activeImage} 
               crossOrigin="anonymous"
               loading="eager"
-              className="max-h-[280px] sm:max-h-[360px] max-w-full object-contain filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.9)] transition-transform duration-500 hover:scale-110" 
+              className="max-h-full max-w-full object-contain drop-shadow-2xl transition-transform duration-500 hover:scale-105" 
               alt={product.name} 
             />
           </div>

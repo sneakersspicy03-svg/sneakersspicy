@@ -62,6 +62,22 @@ async function main() {
   fs.writeFileSync(BUILD_GRADLE, gradleContent, 'utf8');
   console.log("✅ build.gradle actualizado.");
 
+  // 3.5. Limpiar APKs residuales de public/, dist/ y android/ para que no se empaqueten dentro del APK
+  console.log("🧹 Limpiando binarios APK previos de public/ y dist/...");
+  const cleanApks = (dir) => {
+    if (fs.existsSync(dir)) {
+      const files = fs.readdirSync(dir);
+      for (const f of files) {
+        if (f.endsWith('.apk')) {
+          fs.unlinkSync(path.join(dir, f));
+        }
+      }
+    }
+  };
+  cleanApks(path.join(ROOT_DIR, 'public'));
+  cleanApks(path.join(ROOT_DIR, 'dist'));
+  cleanApks(path.join(ROOT_DIR, 'android/app/src/main/assets/public'));
+
   // 4. Compilar bundle web
   console.log("⚙️ Compilando web bundle (npm run build)...");
   execSync('npm run build', { cwd: ROOT_DIR, stdio: 'inherit' });
@@ -71,6 +87,9 @@ async function main() {
   execSync('npx cap sync android', { cwd: ROOT_DIR, stdio: 'inherit' });
 
   // 6. Compilar APK Android
+  console.log("🧹 Limpiando caché de Gradle (./gradlew clean)...");
+  execSync('./gradlew clean', { cwd: path.join(ROOT_DIR, 'android'), stdio: 'inherit' });
+
   console.log("⚙️ Compilando APK con Gradle (./gradlew assembleDebug)...");
   execSync('./gradlew assembleDebug', { cwd: path.join(ROOT_DIR, 'android'), stdio: 'inherit' });
 
