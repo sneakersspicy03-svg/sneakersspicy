@@ -1,11 +1,11 @@
 {
-  "version": "2.2.4",
-  "versionCode": 9,
-  "downloadUrl": "https://raw.githubusercontent.com/sneakersspicy03-svg/sneakersspicy/app-mobile/sneakers-spicy-v2.2.4.apk",
-  "releaseDate": "2026-09-08",
-  "title": "Actualización Sneakers Spicy v2.2.4",
+  "version": "2.2.5",
+  "versionCode": 10,
+  "downloadUrl": "https://raw.githubusercontent.com/sneakersspicy03-svg/sneakersspicy/app-mobile/sneakers-spicy-v2.2.5.apk",
+  "releaseDate": "2026-09-11",
+  "title": "Actualización Sneakers Spicy v2.2.5",
   "changelog": [
-    "Aumento considerable del tamaño y escala de las imágenes de calzado en tarjetas y detalle"
+    "Zoom directo y mayor presencia visual en imágenes de productos (catálogo y detalle)"
   ],
   "forceUpdate": false
 }

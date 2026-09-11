@@ -98,7 +98,7 @@ const StockXOverview: React.FC<StockXOverviewProps> = ({
             src={product.image} 
             alt={product.name} 
             loading="lazy"
-            className="w-full h-full object-contain scale-125 sm:scale-120 drop-shadow-2xl transition-transform duration-300 group-hover:scale-135" 
+            className="w-full h-full object-contain transform scale-125 origin-center drop-shadow-2xl transition-transform duration-300 group-hover:scale-135" 
           />
           {isSoldOut && (
             <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px] flex items-center justify-center">

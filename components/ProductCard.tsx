@@ -31,7 +31,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, onClick
           src={product.image} 
           alt={product.name} 
           loading="lazy"
-          className="w-full h-full object-contain scale-125 sm:scale-120 drop-shadow-2xl transition-transform duration-300 group-hover:scale-135" 
+          className="w-full h-full object-contain transform scale-125 origin-center drop-shadow-2xl transition-transform duration-300 group-hover:scale-135" 
         />
         <div className="absolute top-2.5 left-2.5">
           <span className="px-2.5 py-0.5 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded shadow-lg italic">

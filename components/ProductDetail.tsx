@@ -159,7 +159,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
               src={activeImage} 
               crossOrigin="anonymous"
               loading="eager"
-              className="max-h-full max-w-full w-full h-full object-contain scale-110 sm:scale-120 drop-shadow-2xl transition-transform duration-500 hover:scale-125" 
+              className="max-h-full max-w-full w-full h-full object-contain transform scale-125 origin-center drop-shadow-2xl transition-transform duration-500 hover:scale-135" 
               alt={product.name} 
             />
           </div>
@@ -177,7 +177,7 @@ export const ProductDetail: React.FC<ProductDetailProps> = ({
                       : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-100'
                   }`}
                 >
-                  <img src={img.url} crossOrigin="anonymous" className="w-full h-full object-contain" alt="" />
+                  <img src={img.url} crossOrigin="anonymous" className="w-full h-full object-contain transform scale-125 origin-center transition-transform duration-300" alt="" />
                 </button>
               ))}
             </div>
